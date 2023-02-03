@@ -1,7 +1,7 @@
-#include <iom32v.h>
+#include <iom32v.h>//Include files for Atmega 32 controller
 #include <macros.h>
 
-unsigned char data=0x00,start_ts=0,gain=0;
+unsigned char data=0x00,start_ts=0,gain=0;//Declaring global variables
 unsigned char i,i1,i2,delay=0;
 unsigned char symbol=0x00;
 unsigned char stop_init=0;
@@ -22,7 +22,7 @@ unsigned int fkvant=1, iupor=20;
 unsigned char sign_current, sign_voltage,sign_power;
 unsigned long int power;
 unsigned char tmp=0, temp=0, perem=0;
-unsigned char  mass[60]={0x08, 0x04, 0x24, 0x2F, 0x24, 0x2F, 0x24, 0x2F, 
+unsigned char  mass[60]={0x08, 0x04, 0x24, 0x2F, 0x24, 0x2F, 0x24, 0x2F, //greetings
                          0x08, 0x09, 0x24, 0x28, 0x2A, 0x28, 0x2A, 0x28,  
 						 0x09, 0x02, 0x22, 0x22, 0x2A, 0x29, 0x2A, 0x2B, 
 						 0x25, 0x24, 0x24, 0x25, 0x25, 0x28, 0x22, 0x2D, 
@@ -30,7 +30,7 @@ unsigned char  mass[60]={0x08, 0x04, 0x24, 0x2F, 0x24, 0x2F, 0x24, 0x2F,
 						 0x2A, 0x25, 0x22, 0x22, 0x0D, 0x08, 0x27, 0x26,
 					     0x26, 0x25, 0x27, 0x22, 0x28, 0x20, 0x23, 0x21,
 						 0x22, 0x2E, 0x23, 0x21};
-unsigned char mass1[62]={0x25, 0x25, 0x2C, 0x27, 0x23, 0x2D, 0x08, 0x08,
+unsigned char mass1[62]={0x25, 0x25, 0x2C, 0x27, 0x23, 0x2D, 0x08, 0x08,//working window 1
 		 	  			 0x24, 0x22, 0x0C, 0x00, 0x24, 0x29, 0x2C, 0x27, 
 						 0x23, 0x2D, 0x0C, 0x09, 0x24, 0x21, 0x09, 0x00,   
 						 0x26, 0x21, 0x26, 0x2C, 0x26, 0x26, 0x26, 0x21,   
@@ -38,31 +38,36 @@ unsigned char mass1[62]={0x25, 0x25, 0x2C, 0x27, 0x23, 0x2D, 0x08, 0x08,
 						 0x26, 0x27, 0x27, 0x22, 0x26, 0x25, 0x26, 0x25,
 						 0x0D, 0x00, 0x25, 0x20, 0x2C, 0x27, 0x23, 0x2D,  
 						 0x0D, 0x09, 0x24, 0x22, 0x2B, 0x2F};
-unsigned char mass2[34]={0x0C, 0x00, 0x25, 0x24, 0x26, 0x25, 0x2B, 0x2A,
+unsigned char mass2[34]={0x0C, 0x00, 0x25, 0x24, 0x26, 0x25, 0x2B, 0x2A,//working window 2
                          0x27, 0x29, 0x2E, 0x26, 0x2B, 0x28, 0x2B, 0x29,
 						 0x28, 0x20, 0x2B, 0x2E, 0x26, 0x21, 0x27, 0x20,
 						 0x26, 0x21, 0x2B, 0x2C, 0x26, 0x25, 0x2B, 0x2F,
 						 0x27, 0x20};
-unsigned char mass3[14]={0x09, 0x04, 0x24, 0x2B, 0x27, 0x20, 0x2B, 0x2F,
+unsigned char mass3[14]={0x09, 0x04, 0x24, 0x2B, 0x27, 0x20, 0x2B, 0x2F,//Крт
                          0x23, 0x2D, 0x23, 0x21, 0x22, 0x2F};
-unsigned char mass4[10]={0x09, 0x04, 0x25, 0x24, 0x27, 0x20, 0x2B, 0x2F,
+unsigned char mass4[10]={0x09, 0x04, 0x25, 0x24, 0x27, 0x20, 0x2B, 0x2F,//Трт
                          0x23, 0x2D};
-unsigned char mass5[10]={0x09, 0x04, 0x24, 0x2B, 0x27, 0x20, 0x2B, 0x2D, 
+unsigned char mass5[10]={0x09, 0x04, 0x24, 0x2B, 0x27, 0x20, 0x2B, 0x2D,//Крн 	
                          0x23, 0x2D};
-unsigned char mass6[10]={0x09, 0x04, 0x25, 0x24, 0x27, 0x20, 0x2B, 0x2D,
+unsigned char mass6[10]={0x09, 0x04, 0x25, 0x24, 0x27, 0x20, 0x2B, 0x2D,//Трн
                          0x23, 0x2D};
-unsigned char mass7[10]={0x09, 0x04, 0x24, 0x2B, 0x2E, 0x23, 0x2B, 0x2F,
+unsigned char mass7[10]={0x09, 0x04, 0x24, 0x2B, 0x2E, 0x23, 0x2B, 0x2F,//Кдт
                          0x23, 0x2D};
-unsigned char mass8[10]={0x09, 0x04, 0x24, 0x2B, 0x2E, 0x23, 0x2B, 0x2D,
+unsigned char mass8[10]={0x09, 0x04, 0x24, 0x2B, 0x2E, 0x23, 0x2B, 0x2D,//Кдн
                          0x23, 0x2D};
-unsigned char mass9[16]={0x09, 0x05, 0x27, 0x24, 0x2B, 0x2A, 
+unsigned char mass9[16]={0x09, 0x05, 0x27, 0x24, 0x2B, 0x2A, //Тк
                          0x23, 0x2D, 0x09, 0x0A, 0x2B, 0x2C, 0x26, 0x23};
-unsigned char mass10[14]={0x09, 0x04, 0x24, 0x29, 0x26, 0x2D,
+unsigned char mass10[14]={0x09, 0x04, 0x24, 0x29, 0x26, 0x2D,//Im
                           0x23, 0x2D, 0x09, 0x0A, 0x24, 0x21}; 					 						 						  
 unsigned char uart_data=0x00, post_1=0, post_2=0, answer=0, f=0, y=0;						 
 
-void port_init(void)
+void port_init(void)//Function to initialize ports
 {
+	// DDx | Px |  Mode  | resistor | Note
+    // 0   | 0  |  Input | Off      | Pin disconnected from circuit
+	// 0   | 1  |  Input | On       | Pin - current source
+	// 1   | 0  |  Output| Off      | Output "0"
+	// 1   | 1  |  Output| Off      | Output "1"
  PORTA = 0x00;
  DDRA  = 0xFF;
  PORTB = 0x00;
@@ -73,15 +78,15 @@ void port_init(void)
  DDRD  = 0xFF;
 }
 
-void timer0_init(void)
+void timer0_init(void)// Timer T0 initialization function
 {
  TCCR0 = 0x00; 
  TCNT0 = 0x00;
- OCR0  = 0x7D;  
- TCCR0 = 0x0B;//CTC mode, clk/64, 1 ms preset
+ OCR0  = 0x7D;  // Interrupt period - 1 ms
+ TCCR0 = 0x0B;//CTC mode, clk/64, 1 ms preset, Kdel=64, reset on match
 }
 
-void uart0_init(void)
+void uart0_init(void)// UART initialization function
 {
  UCSRB = 0x00; 
  UCSRA = 0x00;//uni-processor mode, 1x speed
@@ -89,10 +94,11 @@ void uart0_init(void)
  UBRRL = 0x33;//0x33 - 9600 baud for 8MHz
  UBRRH = 0x00;//
  UCSRB = (1<<RXCIE)|(1<<RXEN)|(1<<TXEN);//RX enable, RX complete int,TX enable
+ //Enable interrupt on completion of receive, enable receive, enable transmit
 }
 
-#pragma interrupt_handler timer0_comp_isr:iv_TIM0_COMP
-void timer0_comp_isr(void)
+#pragma interrupt_handler timer0_comp_isr:iv_TIM0_COMP//T0 timer interrupt vector
+void timer0_comp_isr(void)// timer interrupt handler function T0
 {
  CLI();
  switch(start_ts)
@@ -129,7 +135,7 @@ void timer0_comp_isr(void)
    }
    else
    {
-   flag=3;
+   flag=3//switch to parameter cycle display
    }//go to "alfa"-->"current"-->"voltage"-->"power" indication
    flag2=0;
    cnt2=0;
@@ -138,13 +144,13 @@ void timer0_comp_isr(void)
  SEI();
 }
 
-#pragma interrupt_handler uart0_rx_isr:iv_USART0_RXC
-void uart0_rx_isr(void)
+#pragma interrupt_handler uart0_rx_isr:iv_USART0_RXC//// UART interrupt vector
+void uart0_rx_isr(void)// UART interrupt handler
 {
  CLI();
  uart_data=UDR;
  global=uart_data;
- global=global>>7;
+ global=global>>7;//high bit selection
  global&=0x01;
  if(global==1)
     {
@@ -155,11 +161,11 @@ void uart0_rx_isr(void)
 	}
 	if(post_2==0)
 		   {  
-	          if(uart_data==0x99)
+	          if(uart_data==0x99)//transmission start code
 			          {post_2=1; post_1=0; answer=0x99;}
 	          else    {post_1=0; post_2=0; answer=0xFF;}
             }
-    else    {post2();   } 
+    else    {post2();   } //call data receive subroutine 2
 	 }
  else
  {
@@ -169,9 +175,9 @@ f=0;
 y=1;
 }
 else {y=1;}
-    if(uart_data==0x77)     {post_1=0;answer=0x77;}
+    if(uart_data==0x77)     {post_1=0;answer=0x77;}//keyboard button click code
     else {
-		post1();
+		post1();//call routine for receiving data 1
 		 }
    }
  SEI();
@@ -384,7 +390,7 @@ switch(post_2)
                                        break;
                                  }
 }
-void transmit_data(void)
+void transmit_data(void)// return code
 {
  if((UCSRA&0x20)==0x20)//data register empty
   {
@@ -402,15 +408,15 @@ void data_ts(void)
   switch(gain)
     {
     case 1:
-		    i2=50;
+		    i2=50;//50ms delay
  			i1=0;	
 	break;
     case 2:
-		    i2=5;
+		    i2=5;//5ms delay
  			i1=0;
 	break;
     case 3:
-		   i2=1;
+		   i2=1;//1ms delay
  		   i1=0;
 	break;
     }
@@ -423,7 +429,7 @@ void data_ts(void)
      {
 	case 0: ; break;
 	case 1:
-	         PORTC=data;
+	         PORTC=data;//data output to LCD legs
 			 for(i=1;i<=100;i++) {;}
 			 PORTC|=0x40;//set E
 			 for(i=1;i<=100;i++) {;}
@@ -438,7 +444,7 @@ void data_ts(void)
    }	
  }
 
-void digit(void)
+void digit(void)// numbers
   {
   switch(symbol)
 		 {
@@ -505,7 +511,7 @@ void digit(void)
 		 }
   } 
  
-void init_devices(void)
+void init_devices(void)//device initialization subroutine
 {
  CLI(); 
  port_init();
@@ -513,7 +519,7 @@ void init_devices(void)
  uart0_init();
  MCUCR = 0x00;
  GICR  = 0x00;//no external interrupts
- TIMSK = 0x02;//T0IC interrupt enable 
+ TIMSK = 0x02;//T0IC interrupt enable // Resolution T0 by match SEI()
  SEI(); 
 }
 
@@ -547,17 +553,17 @@ void main(void)
 	  stop_init=1;
    }
   //-------data transfering------
-  if(global==1)
+  if(global==1)//high bit
   {
-  flag_2();
+  flag_2();//calling the subroutine for creating a working window 2
   }
    else
    {
-  flag_1();
+  flag_1();//calling the subroutine for creating a working window 1
    }
   if(answer!=0)
    {
-   transmit_data();
+   transmit_data();//transfer response code
    }
   }
 }

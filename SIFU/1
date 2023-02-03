@@ -1,0 +1,555 @@
+//ICC-AVR application builder : 31.10.2010 12:51:20
+// Target : M8535
+// Crystal: 8.0000Mhz
+
+#include <iom8535v.h>
+#include <macros.h>
+
+//------------converter---------------------
+signed int alfa=0;
+signed int alfa0=1015;//1 deg.=7
+signed int alfamin=35;//1 deg.=7
+signed int alfamax=1190;//1 deg.=7
+signed int value;
+signed int volt_os, tok_os;
+signed int kprop_v=4, tinteg_v=100;
+signed int kprop_i=1, tinteg_i=8;
+//signed int kust_v=1, kust_i=1;
+//signed int kos_v=1, kos_i=1;
+signed long oshibka_v=0, oshibka_i=0, oshibkaold_v=0, oshibkaold_i=0; 
+signed long Uvh=0, Urn=0, Urt=0, Uph=0, Uout=0, Ui_p=0, Ui_i=0;
+signed long Uout_v=0, Uv_i=0, Uv_p=0;
+unsigned char FWD=1, REV=0;
+unsigned char FWD_ref=1, REV_ref=0;
+unsigned char pause=0,standby=1;
+unsigned char count=0,count1=0;
+unsigned char fault=1;
+unsigned char soft_start=0;
+//----------------indicator-----------------------
+unsigned char sign_voltage=0,sign_current=0;
+unsigned char cnt_i;//periods counter
+unsigned int alfa_i=0, current_i[20], voltage_i[20];
+signed int tok_i, volt_i;
+//-----------------usart--------------------------
+unsigned char flag=0,post=0;
+unsigned int temp=0;
+unsigned char data=0x00;
+unsigned char uart_data=0x00;
+unsigned char flag1=0;
+//------------------------------------------------
+
+void port_init(void)
+{
+ PORTA = 0xF8;
+ DDRA  = 0x00;
+ PORTB = 0x00;
+ DDRB  = 0xFF;
+ PORTC = 0x00; 
+ DDRC  = 0xFF;
+ PORTD = 0x4C;//01001100=0x4C
+ DDRD  = 0xB3; //10110011=0xB3
+}
+
+void adc_init(void)
+{
+ ADCSRA = 0x00; 
+ ADMUX = 0x40;// AVCC reference voltage
+ ADCSRA  = 0x8E;//ADEN, clk/64 prescaler (100us conversion time)
+}
+
+void timer0_init(void)
+{
+ TCCR0 = 0x00;
+ TCNT0 = 0x00;
+ OCR0  = 0x7D;//1 ms gain
+ TCCR0 = 0x8B;//clk/64 CTC mode
+}
+
+void timer1_init(void)
+{
+ TCCR1B = 0x00; 
+ TCNT1H = 0x00; 
+ TCNT1L = 0x00;
+ OCR1AH = 0x00;
+ OCR1AL = 0x00;
+ OCR1BH = 0x00;
+ OCR1BL = 0x00;
+ TCCR1A = 0x00;
+ TCCR1B = 0x00;// to start write 0x03 (clk/64)
+}
+
+void timer2_init(void)
+{
+ TCCR2 = 0x00; 
+ TCNT2 = 0x00; 
+ ASSR = 0x00;
+ OCR2  = 0x9C;//5ms pause
+ TCCR2 = 0x00;//to start write 0x06
+}
+
+void uart0_init(void)
+{
+ UCSRB = 0x00; 
+ UCSRA = 0x00;//uni-processor mode, 1x speed
+ UCSRC = (1<<URSEL)|(1<<USBS)|(1<<UCSZ1)|(1<<UCSZ0); //8-bit frame
+ UBRRL = 0x33;//0x33 - 9600 baud for 8MHz
+ UBRRH = 0x00;//
+ UCSRB = (1<<RXCIE)|(1<<RXEN)|(1<<TXEN);//RX enable, RX complete int,TX enable
+}
+
+#pragma interrupt_handler adc_isr:iv_ADC
+void adc_isr(void)
+{
+ CLI();
+ value=ADCL;
+ value|=ADCH<<8;
+ value=value-0x1FF;//2,5V zero point
+ switch(ADMUX)
+  {
+  case 0x40://Uvh
+  	   		  	 if(value>=-4&&value<=4) PORTC|=0x80;
+                 else PORTC&=0x7F;//zero point indication  
+  	   		  	  Uvh=value;
+				  ADMUX=0x41;
+				  ADCSRA|=0x40;//restart ADC
+  break;
+  case 0x41://Voltage
+  	   			  if(value>=-4&&value<=4) PORTC|=0x40;
+                  else PORTC&=0xBF;//zero point indication  
+  	   		  	  voltage_i[count1]=value;
+				  volt_os=value;
+				  count1+=1;
+				  if(count1==20)
+				   {
+				    volt_i=0;
+				    for(count1=0;count1<20;count1++)
+				    {
+				     volt_i=volt_i+voltage_i[count1];
+				    }
+				   volt_i=volt_i/20;
+				   count1=0;
+				   if(volt_i>=0) 
+					 {
+					 sign_voltage=0;
+					 }
+					else 
+					 {
+					 sign_voltage=1;//sign of measured voltage
+					 volt_i=-volt_i;//modul of measured voltage
+					 }
+				  }
+				  ADMUX=0x42;
+				  ADCSRA|=0x40;//restart ADC
+  break;
+  case 0x42://Current
+  	   			 if(value>=-4&&value<=4) PORTC|=0x20;
+                 else PORTC&=0xDF;//zero point indication
+  	   			 current_i[count]=value;
+				 tok_os=value;
+				 count+=1;
+				 if(count==20)
+				   {
+				   tok_i=0;
+				   for(count=0;count<20;count++)
+				    {
+				    tok_i=tok_i+current_i[count];
+				    }
+				   tok_i=tok_i/20;
+				   count=0;
+				   if(tok_i>=0) 
+					 {
+					 sign_current=1;
+					 }
+					else 
+					 {
+					 sign_current=0;//sign of measured current
+					 tok_i=-tok_i;//modul of measured current
+					 }
+				   if(tok_i>=358) //102-1A; 153-1,5A; 204-2A; 255-2,5A; 306-3A; 358-3,5A; 409-4A
+				    {
+					fault=1;
+					PORTC&=0xE0;//switch all pulces off
+					}
+				   }
+				 ADMUX=0x40;
+  break;
+  }
+ SEI();
+}
+
+#pragma interrupt_handler int0_isr:iv_INT0
+void int0_isr(void)
+{
+CLI();
+if(TCCR1B==0x00)
+ {
+ PORTC&=0xE0;//switch all pulces off
+ alfa+=alfa0;
+ if(alfa<=alfamin) alfa=alfamin;//lower limit of alfa
+ if(alfa>=alfamax) alfa=alfamax;//upper limit of alfa
+ //-----------------------------------------
+ if((PIND&0x40)==0x00)//start/stop
+    {
+	soft_start=0;
+	alfa=alfamax;
+	}
+	else
+	 {
+	 if(soft_start==0)
+	  {
+	  alfa=alfa0;
+	  soft_start=1;
+	  }
+	 }
+ //-----------------------------------------	
+ OCR1A=alfa;
+ TCCR1B=0x03;//start T1 for alfa counting
+ }
+cnt_i+=1;
+if(cnt_i==100)//reboot time ~1 sec.
+ {
+ cnt_i=0;
+ alfa_i=alfa/7;
+ flag=1;//flag for start transmition
+ }
+alfa=0;//reset alfa gain
+SEI();
+}
+
+#pragma interrupt_handler int1_isr:iv_INT1
+void int1_isr(void)
+{
+CLI();
+if((PIND&0x08)==0x08)//zero-current
+    {
+	TCCR2=0x06;//start T2 for 5ms pause counting
+	PORTD|=0x80;
+	pause=1;
+	}
+else//current is not zero
+	{
+	TCCR2=0x00;//stop T2
+	TCNT2=0x00;
+	pause=0;
+	}
+SEI();
+}
+
+#pragma interrupt_handler timer0_comp_isr:iv_TIM0_COMP
+void timer0_comp_isr(void)
+{
+ CLI();
+ //-------------------Speed regulator---------------
+ 
+ oshibka_v=-5;
+ oshibka_v-=volt_os;
+ oshibka_v=oshibka_v<<8;
+ if(kprop_v==1) Ui_p=oshibka_v;
+ /*else if(kprop_v<=2) Uv_p=oshibka_v<<1;
+ else if(kprop_v<=4) Uv_p=oshibka_v<<2;
+ else if(kprop_v<=8) Uv_p=oshibka_v<<3;
+ else if(kprop_v<=16) Uv_p=oshibka_v<<4;
+ else if(kprop_v<=32) Uv_p=oshibka_v<<5;*/
+ if(tinteg_v==0) Uv_i=0;
+ else if(tinteg_v==1) Uv_i=oshibka_v;
+ //else if(tinteg_v<=2) Uv_i=oshibka_v>>1;
+ //else if(tinteg_v<=4) Uv_i=oshibka_v>>2;
+ //else if(tinteg_v<=8) Uv_i=oshibka_v>>3;
+ /*else if(tinteg_v<=16) Uv_i=oshibka_v>>4;
+ else if(tinteg_v<=32) Uv_i=oshibka_v>>5;
+ else if(tinteg_v<=64) Uv_i=oshibka_v>>6;
+ else if(tinteg_v<=128) Uv_i=oshibka_v>>7;*/
+ Urn=Uv_p+Uv_i+oshibkaold_v;
+ Uout_v=Urn;
+ oshibkaold_v=Uout_v-Uv_p;
+ if(Urn>=524032) Urn=524032;
+ else if(Urn<-524032) Urn=-524032;
+ //-------------------Current regulator---------------
+ tok_os=tok_os<<8;
+ oshibka_i=Urn-tok_os;
+ if(kprop_i==1) Ui_p=oshibka_i;
+ /*else if(kprop_i<=2) Ui_p=oshibka_i>>1;
+ else if(kprop_i<=4) Ui_p=oshibka_i>>2;
+ else if(kprop_i<=8) Ui_p=oshibka_i>>3;
+ else if(kprop_i<=16) Ui_p=oshibka_i>>4;
+ else if(kprop_i<=32) Ui_p=oshibka_i>>5;*/
+ if(tinteg_i==0) Ui_i=0;
+ else if(tinteg_i==1) Ui_i=oshibka_i;
+ //else if(tinteg_i<=2) Ui_i=oshibka_i>>1;
+ //else if(tinteg_i<=4) Ui_i=oshibka_i>>2;
+ //else if(tinteg_i<=8) Ui_i=oshibka_i>>3;
+ /*else if(tinteg_i<=16) Ui_i=oshibka_i>>4;
+ else if(tinteg_i<=32) Ui_i=oshibka_i>>5;*/
+ Urt=Ui_p+Ui_i+oshibkaold_i;
+ Uout=Urt;
+ oshibkaold_i=Uout-Ui_p;
+ if(Urt>=524032) Urt=524032;
+ else if(Urt<-524032) Urt=-524032;
+ Urt=Urt>>8;
+ //-----------------Characteristics switcher--------------
+/* if(FWD==1)
+  {
+  Urt=-Urt;//drive mode
+  }*/
+  alfa=Urt;
+  //---------------Seed direction sensor-----------------
+  /*if(Urn>=2)*/
+  // {
+   FWD_ref=1;
+   REV_ref=0;
+  // }
+  /* else if(Urn<=-2)
+    {
+	FWD_ref=0;
+	REV_ref=1;
+	}*/
+ //---------------------------------------------------------
+ ADCSRA|=0x40;//restart ADC conversion
+ SEI();
+}
+
+#pragma interrupt_handler timer1_compa_isr:iv_TIM1_COMPA
+void timer1_compa_isr(void)
+{
+ CLI();
+ TCCR1B=0x00;//stop T1
+ TCNT1=0;//reset T1
+ PORTC|=0x10;//control output
+ if(pause==0)
+  {
+  if((standby==0)&&(fault==0))
+   {
+    switch(FWD)
+     {
+	  case 0://backward
+  	   	 	if((PIND&0x04)==0x04)//positive sin
+			 {
+			 PORTC&=0xF0;//switch all pulces off
+			 PORTC|=0x01;//VS1,VS2 "REV"
+			 }
+			 else//negative sin
+			  {
+			  PORTC&=0xF0;//switch all pulces off
+			  PORTC|=0x02;//VS3,VS4 "REV"
+			  }
+      break;
+      case 1://forward
+  	   	 	if((PIND&0x04)==0x00)//positive sin
+			 {
+			 PORTC&=0xF0;//switch all pulces off
+			 PORTC|=0x04;//VS1,VS2 "FWD"
+			 }
+			 else//negative sin
+			  {
+			  PORTC&=0xF0;//switch all pulces off
+ 			  PORTC|=0x08;//VS3,VS4 "FWD"
+			  }
+      break;
+	 }
+    }
+  }
+  else
+   {
+   PORTC&=0xF0;//switch all pulces off
+   }
+ SEI();
+}
+
+#pragma interrupt_handler timer2_comp_isr:iv_TIM2_COMP
+void timer2_comp_isr(void)
+{
+CLI();
+TCCR2=0x00;//stop T2
+TCNT2=0x00;//reset T2
+PORTD&=0x7F;
+if((PIND&0x08)==0x08)
+ {
+ FWD=FWD_ref;
+ REV=REV_ref;
+ }
+pause=0;
+SEI();
+}
+
+#pragma interrupt_handler uart0_rx_isr:iv_USART0_RXC
+void uart0_rx_isr(void)
+{
+ CLI();
+ uart_data=UDR;
+ flag1=0;
+ switch(post)
+  {
+  case 0:
+  	   	 if(uart_data==0x55) 		{post=1;}//start talking
+		 else if(uart_data==0xFF)	{post=0;} 
+  break;
+  case 1:
+  	   	 if(uart_data==0x11) 		{post=2;}//alfa
+		 else if(uart_data==0xFF)	{post=1;} 
+  break;
+  case 2:
+  	   	 if(uart_data==0x11) 		{post=3;}//alfa H
+		 else if(uart_data==0xFF)	{post=2;} 
+  break;
+  case 3:
+  	   	 if(uart_data==0x11) 		{post=4;}//alfa L
+		 else if(uart_data==0xFF)	{post=3;} 
+  break;
+  case 4:
+  	   	 if(uart_data==0x22) 		{post=5;}//current
+		 else if(uart_data==0xFF)	{post=4;} 
+  break;
+  case 5:
+  	   	 if(uart_data==0x22) 		{post=6;}//current H
+		 else if(uart_data==0xFF)	{post=5;} 
+  break;
+  case 6:
+  	   	 if(uart_data==0x22) 		{post=7;}//current L
+		 else if(uart_data==0xFF)	{post=6;} 
+  break;
+  case 7:
+  	   	 if(uart_data==0x22) 		{post=8;}//sign_current
+		 else if(uart_data==0xFF)	{post=7;} 
+  break;
+  case 8:
+  	   	 if(uart_data==0x33) 		{post=9;}//voltage
+		 else if(uart_data==0xFF)	{post=8;} 
+  break;
+  case 9:
+  	   	 if(uart_data==0x33) 		{post=10;}//voltage H
+		 else if(uart_data==0xFF)	{post=9;} 
+  break;
+  case 10:
+  	   	 if(uart_data==0x33) 		{post=11;}//voltage L
+		 else if(uart_data==0xFF)	{post=10;} 
+  break;
+  case 11:
+  	   	if(uart_data==0x33) 		{post=12;}//sign_voltage
+		else if(uart_data==0xFF)	{post=11;}   
+  break;
+  case 12:
+  	   if(uart_data==0xAA) 		{post=0;flag=0;}//stop talking
+	   else if(uart_data==0xFF)	{post=12;} 
+  break;
+  }
+ SEI();
+}
+
+void transmit_data(void)
+{
+ if((UCSRA&0x20)==0x20)//data register empty
+  {
+ if(flag1==0)
+  {
+  flag1=1;
+  switch(post)
+   {
+   case 0:
+   		  UDR=0x55;//start talking post
+   break;
+   case 1://alfa
+   		  UDR=0x11;
+   break;
+   case 2://alfa_H
+   		 temp=alfa_i>>8;
+		 data=temp;
+		 UDR=data;
+   break;
+   case 3://alfa_L
+   		  temp=alfa_i&0x00FF;
+		  data=temp;
+		  UDR=data;
+   break;
+   case 4://current
+   		  UDR=0x22;
+   break;
+   case 5://current_H
+   		  temp=tok_i>>8;
+		  data=temp;
+		  UDR=data;
+   break;
+   case 6://current_L
+   		  temp=tok_i&0x00FF;
+		  data=temp;
+		  UDR=data;
+   break;
+   case 7://sign_current
+   		  UDR=sign_current;
+   break;
+   case 8://voltage
+   		  UDR=0x33;
+   break;
+   case 9://voltage H
+   		  temp=volt_i>>8;
+		  data=temp;
+		  UDR=data;
+   break;
+   case 10://voltage L
+   		  temp=volt_i&0x00FF;
+		  data=temp;
+		  UDR=data;
+   break;
+   case 11://sign_voltage
+   		  UDR=sign_voltage;
+   break;
+   case 12://stop talking
+   		  UDR=0xAA;
+   break;
+   }
+  }  
+ } 
+}
+
+void init_devices(void)
+{
+ CLI(); 
+ port_init();
+ adc_init();
+ timer0_init();
+ timer1_init();
+ timer2_init();
+ uart0_init();
+ MCUCR = 0x05;//any logical change of INT0, INT1
+ GICR  = 0xC0;// INT0, INT1 enabled
+ TIMSK = 0x92;// T1Compare, T0Compare, T2Compare
+ SEI(); 
+}
+
+void main(void)
+{
+ init_devices();
+while(1)
+ {
+ //---------------------------------------------------
+  if((PIND&0x08)==0x08)//zero-current
+   {
+    FWD=FWD_ref;
+    REV=REV_ref;
+   }
+   if((PIND&0x40)==0x00)//start/stop
+    {
+	standby=1;
+	PORTD=0x00;//all LEDs off
+	}
+	else
+	 {
+	 standby=0;
+	 if(fault==0) {PORTD=0x10;}//normal indication
+	 else         {PORTD=0x20;}//fault indication
+	 }
+  if((fault==1)&&(standby==1))
+    {
+	fault=0;//fault reset
+	}
+//--------------------------------------------------
+if(flag==1)
+ {
+ transmit_data();
+ }
+//--------------------------------------------------	
+  }
+}
+
+
+
+

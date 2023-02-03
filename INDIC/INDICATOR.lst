@@ -1,0 +1,3680 @@
+Interrupt Vectors
+    00000 940C 00DB JMP	__text_start|__start
+    00014 940C 011C JMP	_timer0_comp_isr
+    0001A 940C 0190 JMP	_uart0_rx_isr
+
+Program Code (text area)
+__text_start|__start:
+    000DB E5CF      LDI	R28,0x5F
+    000DC E0D8      LDI	R29,0x8
+    000DD BFCD      OUT	0x3D,R28
+    000DE BFDE      OUT	0x3E,R29
+    000DF 51CE      SUBI	R28,0x1E
+    000E0 40D0      SBCI	R29,0
+    000E1 EA0A      LDI	R16,0xAA
+    000E2 8308      ST	Y,R16
+    000E3 2400      CLR	R0
+    000E4 EAE3      LDI	R30,0xA3
+    000E5 E0F1      LDI	R31,1
+    000E6 E011      LDI	R17,1
+    000E7 3AED      CPI	R30,0xAD
+    000E8 07F1      CPC	R31,R17
+    000E9 F011      BEQ	0x00EC
+    000EA 9201      ST	Z+,R0
+    000EB CFFB      RJMP	0x00E7
+    000EC 8300      ST	Z,R16
+    000ED E7E2      LDI	R30,0x72
+    000EE E0F0      LDI	R31,0
+    000EF E6A0      LDI	R26,0x60
+    000F0 E0B0      LDI	R27,0
+    000F1 E011      LDI	R17,1
+    000F2 E000      LDI	R16,0
+    000F3 BF0B      OUT	0x3B,R16
+    000F4 3BE5      CPI	R30,0xB5
+    000F5 07F1      CPC	R31,R17
+    000F6 F021      BEQ	0x00FB
+    000F7 95C8      LPM
+    000F8 9631      ADIW	R30,1
+    000F9 920D      ST	X+,R0
+    000FA CFF9      RJMP	0x00F4
+    000FB 940E 07C5 CALL	_main
+_exit:
+    000FD CFFF      RJMP	_exit
+FILE: C:\INDIC\indicator.c
+(0001) #include <iom32v.h>
+(0002) #include <macros.h>
+(0003) 
+(0004) unsigned char data=0x00,start_ts=0,gain=0;
+(0005) unsigned char i,i1,i2,delay=0;
+(0006) unsigned char symbol=0x00;
+(0007) unsigned char stop_init=0;
+(0008) unsigned char flag=0,flag1=0,flag2=0;
+(0009) unsigned char cnt=0;
+(0010) unsigned int cnt1=0,cnt2=0;
+(0011) unsigned char d=0,dd=0,ddd=0,dddd=0;
+(0012) unsigned int alfa_i=0,alfa_temp=0;
+(0013) unsigned int tok_i=0, volt_i=0,tok_temp=0,volt_temp=0;
+(0014) unsigned int kprop_i_temp=0, tinteg_i_temp=0, global=0;
+(0015) unsigned int kprop_i=8, tinteg_i=1;
+(0016) unsigned int kprop_v_temp=0, tinteg_v_temp=0;
+(0017) unsigned int kprop_v=4, tinteg_v=32;
+(0018) unsigned int kos_i_temp=0, kos_v_temp=0;
+(0019) unsigned int kos_i=1, kos_v=1;
+(0020) unsigned int fkvant_temp=0, iupor_temp=0;
+(0021) unsigned int fkvant=1, iupor=20;
+(0022) unsigned char sign_current, sign_voltage,sign_power;
+(0023) unsigned long int power;
+(0024) unsigned char tmp=0, temp=0, perem=0;
+(0025) unsigned char  mass[60]={0x08, 0x04, 0x24, 0x2F, 0x24, 0x2F, 0x24, 0x2F, 
+(0026)                          0x08, 0x09, 0x24, 0x28, 0x2A, 0x28, 0x2A, 0x28,  
+(0027) 						 0x09, 0x02, 0x22, 0x22, 0x2A, 0x29, 0x2A, 0x2B, 
+(0028) 						 0x25, 0x24, 0x24, 0x25, 0x25, 0x28, 0x22, 0x2D, 
+(0029) 						 0x2A, 0x28, 0x25, 0x20, 0x24, 0x2F, 0x2A, 0x2A, 
+(0030) 						 0x2A, 0x25, 0x22, 0x22, 0x0D, 0x08, 0x27, 0x26,
+(0031) 					     0x26, 0x25, 0x27, 0x22, 0x28, 0x20, 0x23, 0x21,
+(0032) 						 0x22, 0x2E, 0x23, 0x21};
+(0033) unsigned char mass1[62]={0x25, 0x25, 0x2C, 0x27, 0x23, 0x2D, 0x08, 0x08,
+(0034) 		 	  			 0x24, 0x22, 0x0C, 0x00, 0x24, 0x29, 0x2C, 0x27, 
+(0035) 						 0x23, 0x2D, 0x0C, 0x09, 0x24, 0x21, 0x09, 0x00,   
+(0036) 						 0x26, 0x21, 0x26, 0x2C, 0x26, 0x26, 0x26, 0x21,   
+(0037) 						 0x23, 0x2D, 0x09, 0x09, 0x26, 0x24, 0x26, 0x25,  
+(0038) 						 0x26, 0x27, 0x27, 0x22, 0x26, 0x25, 0x26, 0x25,
+(0039) 						 0x0D, 0x00, 0x25, 0x20, 0x2C, 0x27, 0x23, 0x2D,  
+(0040) 						 0x0D, 0x09, 0x24, 0x22, 0x2B, 0x2F};
+(0041) unsigned char mass2[34]={0x0C, 0x00, 0x25, 0x24, 0x26, 0x25, 0x2B, 0x2A,
+(0042)                          0x27, 0x29, 0x2E, 0x26, 0x2B, 0x28, 0x2B, 0x29,
+(0043) 						 0x28, 0x20, 0x2B, 0x2E, 0x26, 0x21, 0x27, 0x20,
+(0044) 						 0x26, 0x21, 0x2B, 0x2C, 0x26, 0x25, 0x2B, 0x2F,
+(0045) 						 0x27, 0x20};
+(0046) unsigned char mass3[14]={0x09, 0x04, 0x24, 0x2B, 0x27, 0x20, 0x2B, 0x2F,
+(0047)                          0x23, 0x2D, 0x23, 0x21, 0x22, 0x2F};
+(0048) unsigned char mass4[10]={0x09, 0x04, 0x25, 0x24, 0x27, 0x20, 0x2B, 0x2F,
+(0049)                          0x23, 0x2D};
+(0050) unsigned char mass5[10]={0x09, 0x04, 0x24, 0x2B, 0x27, 0x20, 0x2B, 0x2D, 
+(0051)                          0x23, 0x2D};
+(0052) unsigned char mass6[10]={0x09, 0x04, 0x25, 0x24, 0x27, 0x20, 0x2B, 0x2D,
+(0053)                          0x23, 0x2D};
+(0054) unsigned char mass7[10]={0x09, 0x04, 0x24, 0x2B, 0x2E, 0x23, 0x2B, 0x2F,
+(0055)                          0x23, 0x2D};
+(0056) unsigned char mass8[10]={0x09, 0x04, 0x24, 0x2B, 0x2E, 0x23, 0x2B, 0x2D,
+(0057)                          0x23, 0x2D};
+(0058) unsigned char mass9[16]={0x09, 0x05, 0x27, 0x24, 0x2B, 0x2A, 
+(0059)                          0x23, 0x2D, 0x09, 0x0A, 0x2B, 0x2C, 0x26, 0x23};
+(0060) unsigned char mass10[14]={0x09, 0x04, 0x24, 0x29, 0x26, 0x2D,
+(0061)                           0x23, 0x2D, 0x09, 0x0A, 0x24, 0x21}; 					 						 						  
+(0062) unsigned char uart_data=0x00, post_1=0, post_2=0, answer=0, f=0, y=0;						 
+(0063) 
+(0064) void port_init(void)
+(0065) {
+(0066)  PORTA = 0x00;
+_port_init:
+    000FE 2422      CLR	R2
+    000FF BA2B      OUT	0x1B,R2
+(0067)  DDRA  = 0xFF;
+    00100 EF8F      LDI	R24,0xFF
+    00101 BB8A      OUT	0x1A,R24
+(0068)  PORTB = 0x00;
+    00102 BA28      OUT	0x18,R2
+(0069)  DDRB  = 0xFF;
+    00103 BB87      OUT	0x17,R24
+(0070)  PORTC = 0x00; 
+    00104 BA25      OUT	0x15,R2
+(0071)  DDRC  = 0xFF;
+    00105 BB84      OUT	0x14,R24
+(0072)  PORTD = 0x00;
+    00106 BA22      OUT	0x12,R2
+(0073)  DDRD  = 0xFF;
+    00107 BB81      OUT	0x11,R24
+    00108 9508      RET
+(0074) }
+(0075) 
+(0076) void timer0_init(void)
+(0077) {
+(0078)  TCCR0 = 0x00; 
+_timer0_init:
+    00109 2422      CLR	R2
+    0010A BE23      OUT	0x33,R2
+(0079)  TCNT0 = 0x00;
+    0010B BE22      OUT	0x32,R2
+(0080)  OCR0  = 0x7D;  
+    0010C E78D      LDI	R24,0x7D
+    0010D BF8C      OUT	0x3C,R24
+(0081)  TCCR0 = 0x0B;//CTC mode, clk/64, 1 ms preset
+    0010E E08B      LDI	R24,0xB
+    0010F BF83      OUT	0x33,R24
+    00110 9508      RET
+(0082) }
+(0083) 
+(0084) void uart0_init(void)
+(0085) {
+(0086)  UCSRB = 0x00; 
+_uart0_init:
+    00111 2422      CLR	R2
+    00112 B82A      OUT	0x0A,R2
+(0087)  UCSRA = 0x00;//uni-processor mode, 1x speed
+    00113 B82B      OUT	0x0B,R2
+(0088)  UCSRC = (1<<URSEL)|(1<<USBS)|(1<<UCSZ1)|(1<<UCSZ0); //8-bit frame
+    00114 E88E      LDI	R24,0x8E
+    00115 BD80      OUT	0x20,R24
+(0089)  UBRRL = 0x33;//0x33 - 9600 baud for 8MHz
+    00116 E383      LDI	R24,0x33
+    00117 B989      OUT	0x09,R24
+(0090)  UBRRH = 0x00;//
+    00118 BC20      OUT	0x20,R2
+(0091)  UCSRB = (1<<RXCIE)|(1<<RXEN)|(1<<TXEN);//RX enable, RX complete int,TX enable
+    00119 E988      LDI	R24,0x98
+    0011A B98A      OUT	0x0A,R24
+    0011B 9508      RET
+_timer0_comp_isr:
+    0011C 922A      ST	-Y,R2
+    0011D 923A      ST	-Y,R3
+    0011E 930A      ST	-Y,R16
+    0011F 931A      ST	-Y,R17
+    00120 938A      ST	-Y,R24
+    00121 939A      ST	-Y,R25
+    00122 93AA      ST	-Y,R26
+    00123 93EA      ST	-Y,R30
+    00124 B62F      IN	R2,0x3F
+    00125 922A      ST	-Y,R2
+(0092) }
+(0093) 
+(0094) #pragma interrupt_handler timer0_comp_isr:iv_TIM0_COMP
+(0095) void timer0_comp_isr(void)
+(0096) {
+(0097)  CLI();
+    00126 94F8      BCLR	7
+(0098)  switch(start_ts)
+    00127 9100 0061 LDS	R16,start_ts
+    00129 2711      CLR	R17
+    0012A 3000      CPI	R16,0
+    0012B 0701      CPC	R16,R17
+    0012C F0A1      BEQ	0x0141
+    0012D 3001      CPI	R16,1
+    0012E E0E0      LDI	R30,0
+    0012F 071E      CPC	R17,R30
+    00130 F009      BEQ	0x0132
+    00131 C00F      RJMP	0x0141
+(0099)   {
+(0100)   case 0: break;
+(0101)   case 1:
+(0102)             i1+=1;
+    00132 9180 01AB LDS	R24,i1
+    00134 5F8F      SUBI	R24,0xFF
+    00135 9380 01AB STS	i1,R24
+(0103)   	   	 	if(i1>=i2)
+    00137 9020 01AA LDS	R2,i2
+    00139 1582      CP	R24,R2
+    0013A F030      BCS	0x0141
+(0104) 			 {
+(0105) 			 delay=1;
+    0013B E081      LDI	R24,1
+    0013C 9380 0063 STS	delay,R24
+(0106) 			 i1=0;
+    0013E 2422      CLR	R2
+    0013F 9220 01AB STS	i1,R2
+(0107) 			 }
+(0108)   break;
+(0109)   }
+(0110)  if(flag1==1)//time delay 1 second
+    00141 9180 0067 LDS	R24,flag1
+    00143 3081      CPI	R24,1
+    00144 F4C1      BNE	0x015D
+(0111)   {
+(0112)    cnt1+=1;
+    00145 9180 006A LDS	R24,cnt1
+    00147 9190 006B LDS	R25,cnt1+1
+    00149 9601      ADIW	R24,1
+    0014A 9390 006B STS	cnt1+1,R25
+    0014C 9380 006A STS	cnt1,R24
+(0113)    if(cnt1==1000)
+    0014E 3E88      CPI	R24,0xE8
+    0014F E0E3      LDI	R30,3
+    00150 079E      CPC	R25,R30
+    00151 F459      BNE	0x015D
+(0114)    {
+(0115)    flag=1;
+    00152 E081      LDI	R24,1
+    00153 9380 0066 STS	flag,R24
+(0116)    flag1=0;
+    00155 2422      CLR	R2
+    00156 9220 0067 STS	flag1,R2
+(0117)    cnt1=0;
+    00158 2433      CLR	R3
+    00159 9230 006B STS	cnt1+1,R3
+    0015B 9220 006A STS	cnt1,R2
+(0118)    }
+(0119)   }
+(0120)  if(flag2==1)
+    0015D 9180 0068 LDS	R24,flag2
+    0015F 3081      CPI	R24,1
+    00160 F519      BNE	0x0184
+(0121)   {
+(0122)    cnt2+=1;
+    00161 9180 006C LDS	R24,cnt2
+    00163 9190 006D LDS	R25,cnt2+1
+    00165 9601      ADIW	R24,1
+    00166 9390 006D STS	cnt2+1,R25
+    00168 9380 006C STS	cnt2,R24
+(0123)    if(cnt2==1000)
+    0016A 3E88      CPI	R24,0xE8
+    0016B E0E3      LDI	R30,3
+    0016C 079E      CPC	R25,R30
+    0016D F4B1      BNE	0x0184
+(0124)    {
+(0125)    if(y==1)
+    0016E 9180 01A2 LDS	R24,y
+    00170 3081      CPI	R24,1
+    00171 F439      BNE	0x0179
+(0126)    {
+(0127)    flag=1;
+    00172 E081      LDI	R24,1
+    00173 9380 0066 STS	flag,R24
+(0128)    y=0;
+    00175 2422      CLR	R2
+    00176 9220 01A2 STS	y,R2
+(0129)    }
+    00178 C003      RJMP	0x017C
+(0130)    else
+(0131)    {
+(0132)    flag=3;
+    00179 E083      LDI	R24,3
+    0017A 9380 0066 STS	flag,R24
+(0133)    }//go to "alfa"-->"current"-->"voltage"-->"power" indication
+(0134)    flag2=0;
+    0017C 2422      CLR	R2
+    0017D 9220 0068 STS	flag2,R2
+(0135)    cnt2=0;
+    0017F 2433      CLR	R3
+    00180 9230 006D STS	cnt2+1,R3
+    00182 9220 006C STS	cnt2,R2
+(0136)    }
+(0137)   }  
+(0138)  SEI();
+    00184 9478      BSET	7
+    00185 9029      LD	R2,Y+
+    00186 BE2F      OUT	0x3F,R2
+    00187 91E9      LD	R30,Y+
+    00188 91A9      LD	R26,Y+
+    00189 9199      LD	R25,Y+
+    0018A 9189      LD	R24,Y+
+    0018B 9119      LD	R17,Y+
+    0018C 9109      LD	R16,Y+
+    0018D 9039      LD	R3,Y+
+    0018E 9029      LD	R2,Y+
+    0018F 9518      RETI
+_uart0_rx_isr:
+    00190 920A      ST	-Y,R0
+    00191 921A      ST	-Y,R1
+    00192 922A      ST	-Y,R2
+    00193 923A      ST	-Y,R3
+    00194 924A      ST	-Y,R4
+    00195 925A      ST	-Y,R5
+    00196 926A      ST	-Y,R6
+    00197 927A      ST	-Y,R7
+    00198 928A      ST	-Y,R8
+    00199 929A      ST	-Y,R9
+    0019A 930A      ST	-Y,R16
+    0019B 931A      ST	-Y,R17
+    0019C 932A      ST	-Y,R18
+    0019D 933A      ST	-Y,R19
+    0019E 938A      ST	-Y,R24
+    0019F 939A      ST	-Y,R25
+    001A0 93AA      ST	-Y,R26
+    001A1 93BA      ST	-Y,R27
+    001A2 93EA      ST	-Y,R30
+    001A3 93FA      ST	-Y,R31
+    001A4 B60F      IN	R0,0x3F
+    001A5 920A      ST	-Y,R0
+(0139) }
+(0140) 
+(0141) #pragma interrupt_handler uart0_rx_isr:iv_USART0_RXC
+(0142) void uart0_rx_isr(void)
+(0143) {
+(0144)  CLI();
+    001A6 94F8      BCLR	7
+(0145)  uart_data=UDR;
+    001A7 B02C      IN	R2,0x0C
+    001A8 9220 019D STS	uart_data,R2
+(0146)  global=uart_data;
+    001AA 2433      CLR	R3
+    001AB 9230 0083 STS	global+1,R3
+    001AD 9220 0082 STS	global,R2
+(0147)  global=global>>7;
+    001AF E027      LDI	R18,7
+    001B0 E030      LDI	R19,0
+    001B1 9100 0082 LDS	R16,global
+    001B3 9110 0083 LDS	R17,global+1
+    001B5 940E 0EAC CALL	lsr16
+    001B7 9310 0083 STS	global+1,R17
+    001B9 9300 0082 STS	global,R16
+(0148)  global&=0x01;
+    001BB 01C8      MOVW	R24,R16
+    001BC 7081      ANDI	R24,1
+    001BD 7090      ANDI	R25,0
+    001BE 9390 0083 STS	global+1,R25
+    001C0 9380 0082 STS	global,R24
+(0149)  if(global==1)
+    001C2 3081      CPI	R24,1
+    001C3 E0E0      LDI	R30,0
+    001C4 079E      CPC	R25,R30
+    001C5 F531      BNE	0x01EC
+(0150)     {
+(0151) 	if(f==0)
+    001C6 9020 01A1 LDS	R2,f
+    001C8 2022      TST	R2
+    001C9 F429      BNE	0x01CF
+(0152) 	{
+(0153) 	f=1;
+    001CA E081      LDI	R24,1
+    001CB 9380 01A1 STS	f,R24
+(0154) 	y=1;
+    001CD 9380 01A2 STS	y,R24
+(0155) 	}
+(0156) 	if(post_2==0)
+    001CF 9020 019F LDS	R2,post_2
+    001D1 2022      TST	R2
+    001D2 F4B9      BNE	0x01EA
+(0157) 		   {  
+(0158) 	          if(uart_data==0x99)
+    001D3 9180 019D LDS	R24,uart_data
+    001D5 3989      CPI	R24,0x99
+    001D6 F451      BNE	0x01E1
+(0159) 			          {post_2=1; post_1=0; answer=0x99;}
+    001D7 E081      LDI	R24,1
+    001D8 9380 019F STS	post_2,R24
+    001DA 2422      CLR	R2
+    001DB 9220 019E STS	post_1,R2
+    001DD E989      LDI	R24,0x99
+    001DE 9380 01A0 STS	answer,R24
+    001E0 C025      RJMP	0x0206
+(0160) 	          else    {post_1=0; post_2=0; answer=0xFF;}
+    001E1 2422      CLR	R2
+    001E2 9220 019E STS	post_1,R2
+    001E4 9220 019F STS	post_2,R2
+    001E6 EF8F      LDI	R24,0xFF
+    001E7 9380 01A0 STS	answer,R24
+(0161)             }
+    001E9 C01C      RJMP	0x0206
+(0162)     else    {post2();   } 
+    001EA D2C2      RCALL	_post2
+(0163) 	 }
+    001EB C01A      RJMP	0x0206
+(0164)  else
+(0165)  {
+(0166)  if(f==1)
+    001EC 9180 01A1 LDS	R24,f
+    001EE 3081      CPI	R24,1
+    001EF F439      BNE	0x01F7
+(0167) {
+(0168) f=0;
+    001F0 2422      CLR	R2
+    001F1 9220 01A1 STS	f,R2
+(0169) y=1;
+    001F3 E081      LDI	R24,1
+    001F4 9380 01A2 STS	y,R24
+(0170) }
+    001F6 C003      RJMP	0x01FA
+(0171) else {y=1;}
+    001F7 E081      LDI	R24,1
+    001F8 9380 01A2 STS	y,R24
+(0172)     if(uart_data==0x77)     {post_1=0;answer=0x77;}
+    001FA 9180 019D LDS	R24,uart_data
+    001FC 3787      CPI	R24,0x77
+    001FD F439      BNE	0x0205
+    001FE 2422      CLR	R2
+    001FF 9220 019E STS	post_1,R2
+    00201 E787      LDI	R24,0x77
+    00202 9380 01A0 STS	answer,R24
+    00204 C001      RJMP	0x0206
+(0173)     else {
+(0174) 		post1();
+    00205 D018      RCALL	_post1
+(0175) 		 }
+(0176)    }
+(0177)  SEI();
+    00206 9478      BSET	7
+    00207 9009      LD	R0,Y+
+    00208 BE0F      OUT	0x3F,R0
+    00209 91F9      LD	R31,Y+
+    0020A 91E9      LD	R30,Y+
+    0020B 91B9      LD	R27,Y+
+    0020C 91A9      LD	R26,Y+
+    0020D 9199      LD	R25,Y+
+    0020E 9189      LD	R24,Y+
+    0020F 9139      LD	R19,Y+
+    00210 9129      LD	R18,Y+
+    00211 9119      LD	R17,Y+
+    00212 9109      LD	R16,Y+
+    00213 9099      LD	R9,Y+
+    00214 9089      LD	R8,Y+
+    00215 9079      LD	R7,Y+
+    00216 9069      LD	R6,Y+
+    00217 9059      LD	R5,Y+
+    00218 9049      LD	R4,Y+
+    00219 9039      LD	R3,Y+
+    0021A 9029      LD	R2,Y+
+    0021B 9019      LD	R1,Y+
+    0021C 9009      LD	R0,Y+
+    0021D 9518      RETI
+(0178) }
+(0179) void post1(void)
+(0180) {
+(0181) switch(post_1)
+_post1:
+    0021E 9100 019E LDS	R16,post_1
+    00220 2711      CLR	R17
+    00221 3000      CPI	R16,0
+    00222 0701      CPC	R16,R17
+    00223 F031      BEQ	0x022A
+    00224 3001      CPI	R16,1
+    00225 E0E0      LDI	R30,0
+    00226 071E      CPC	R17,R30
+    00227 F409      BNE	0x0229
+    00228 C123      RJMP	0x034C
+    00229 C282      RJMP	0x04AC
+(0182)     {
+(0183)     case 0:
+(0184) 	    {
+(0185)  	  	perem=uart_data;
+    0022A 9020 019D LDS	R2,uart_data
+    0022C 9220 00A2 STS	perem,R2
+(0186) 		temp=uart_data&0xF0;
+    0022E 2D82      MOV	R24,R2
+    0022F 7F80      ANDI	R24,0xF0
+    00230 9380 00A1 STS	temp,R24
+(0187) 		       switch(temp)
+    00232 2F08      MOV	R16,R24
+    00233 2711      CLR	R17
+    00234 3300      CPI	R16,0x30
+    00235 E0E0      LDI	R30,0
+    00236 071E      CPC	R17,R30
+    00237 F409      BNE	0x0239
+    00238 C087      RJMP	0x02C0
+    00239 E380      LDI	R24,0x30
+    0023A E090      LDI	R25,0
+    0023B 1780      CP	R24,R16
+    0023C 0791      CPC	R25,R17
+    0023D F0A4      BLT	0x0252
+    0023E 3100      CPI	R16,0x10
+    0023F E0E0      LDI	R30,0
+    00240 071E      CPC	R17,R30
+    00241 F409      BNE	0x0243
+    00242 C049      RJMP	0x028C
+    00243 E180      LDI	R24,0x10
+    00244 E090      LDI	R25,0
+    00245 1780      CP	R24,R16
+    00246 0791      CPC	R25,R17
+    00247 F024      BLT	0x024C
+    00248 3000      CPI	R16,0
+    00249 0701      CPC	R16,R17
+    0024A F139      BEQ	0x0272
+    0024B C0F6      RJMP	0x0342
+    0024C 3200      CPI	R16,0x20
+    0024D E0E0      LDI	R30,0
+    0024E 071E      CPC	R17,R30
+    0024F F409      BNE	0x0251
+    00250 C055      RJMP	0x02A6
+    00251 C0F0      RJMP	0x0342
+    00252 3500      CPI	R16,0x50
+    00253 E0E0      LDI	R30,0
+    00254 071E      CPC	R17,R30
+    00255 F409      BNE	0x0257
+    00256 C09D      RJMP	0x02F4
+    00257 E580      LDI	R24,0x50
+    00258 E090      LDI	R25,0
+    00259 1780      CP	R24,R16
+    0025A 0791      CPC	R25,R17
+    0025B F034      BLT	0x0262
+    0025C 3400      CPI	R16,0x40
+    0025D E0E0      LDI	R30,0
+    0025E 071E      CPC	R17,R30
+    0025F F409      BNE	0x0261
+    00260 C079      RJMP	0x02DA
+    00261 C0E0      RJMP	0x0342
+    00262 3600      CPI	R16,0x60
+    00263 E0E0      LDI	R30,0
+    00264 071E      CPC	R17,R30
+    00265 F409      BNE	0x0267
+    00266 C0A7      RJMP	0x030E
+    00267 3600      CPI	R16,0x60
+    00268 E0E0      LDI	R30,0
+    00269 071E      CPC	R17,R30
+    0026A F40C      BGE	0x026C
+    0026B C0D6      RJMP	0x0342
+    0026C 3700      CPI	R16,0x70
+    0026D E0E0      LDI	R30,0
+    0026E 071E      CPC	R17,R30
+    0026F F409      BNE	0x0271
+    00270 C0B7      RJMP	0x0328
+    00271 C0D0      RJMP	0x0342
+(0188) 			   {
+(0189) 			   case 0x00: 
+(0190) 						{perem&=0x0F; kprop_i_temp=perem<<4;
+    00272 9180 00A2 LDS	R24,perem
+    00274 708F      ANDI	R24,0xF
+    00275 9380 00A2 STS	perem,R24
+    00277 2E28      MOV	R2,R24
+    00278 2433      CLR	R3
+    00279 0C22      LSL	R2
+    0027A 1C33      ROL	R3
+    0027B 0C22      LSL	R2
+    0027C 1C33      ROL	R3
+    0027D 0C22      LSL	R2
+    0027E 1C33      ROL	R3
+    0027F 0C22      LSL	R2
+    00280 1C33      ROL	R3
+    00281 9230 007F STS	kprop_i_temp+1,R3
+    00283 9220 007E STS	kprop_i_temp,R2
+(0191) 						 post_1=1;answer=0x44;}
+    00285 E081      LDI	R24,1
+    00286 9380 019E STS	post_1,R24
+    00288 E484      LDI	R24,0x44
+    00289 9380 01A0 STS	answer,R24
+(0192)                          break;
+    0028B C0BC      RJMP	0x0348
+(0193) 			   case 0x10:
+(0194) 			            {perem&=0x0F; tinteg_i_temp=perem<<4;
+    0028C 9180 00A2 LDS	R24,perem
+    0028E 708F      ANDI	R24,0xF
+    0028F 9380 00A2 STS	perem,R24
+    00291 2E28      MOV	R2,R24
+    00292 2433      CLR	R3
+    00293 0C22      LSL	R2
+    00294 1C33      ROL	R3
+    00295 0C22      LSL	R2
+    00296 1C33      ROL	R3
+    00297 0C22      LSL	R2
+    00298 1C33      ROL	R3
+    00299 0C22      LSL	R2
+    0029A 1C33      ROL	R3
+    0029B 9230 0081 STS	tinteg_i_temp+1,R3
+    0029D 9220 0080 STS	tinteg_i_temp,R2
+(0195) 						 post_1=1;answer=0x44;}
+    0029F E081      LDI	R24,1
+    002A0 9380 019E STS	post_1,R24
+    002A2 E484      LDI	R24,0x44
+    002A3 9380 01A0 STS	answer,R24
+(0196)                          break;
+    002A5 C0A2      RJMP	0x0348
+(0197) 			   case 0x20:
+(0198) 			            {perem&=0x0F; kprop_v_temp=perem<<4;
+    002A6 9180 00A2 LDS	R24,perem
+    002A8 708F      ANDI	R24,0xF
+    002A9 9380 00A2 STS	perem,R24
+    002AB 2E28      MOV	R2,R24
+    002AC 2433      CLR	R3
+    002AD 0C22      LSL	R2
+    002AE 1C33      ROL	R3
+    002AF 0C22      LSL	R2
+    002B0 1C33      ROL	R3
+    002B1 0C22      LSL	R2
+    002B2 1C33      ROL	R3
+    002B3 0C22      LSL	R2
+    002B4 1C33      ROL	R3
+    002B5 9230 0089 STS	kprop_v_temp+1,R3
+    002B7 9220 0088 STS	kprop_v_temp,R2
+(0199) 						 post_1=1;answer=0x44;}
+    002B9 E081      LDI	R24,1
+    002BA 9380 019E STS	post_1,R24
+    002BC E484      LDI	R24,0x44
+    002BD 9380 01A0 STS	answer,R24
+(0200)                          break;
+    002BF C088      RJMP	0x0348
+(0201) 			   case 0x30:
+(0202) 			            {perem&=0x0F; tinteg_v_temp=perem<<4;
+    002C0 9180 00A2 LDS	R24,perem
+    002C2 708F      ANDI	R24,0xF
+    002C3 9380 00A2 STS	perem,R24
+    002C5 2E28      MOV	R2,R24
+    002C6 2433      CLR	R3
+    002C7 0C22      LSL	R2
+    002C8 1C33      ROL	R3
+    002C9 0C22      LSL	R2
+    002CA 1C33      ROL	R3
+    002CB 0C22      LSL	R2
+    002CC 1C33      ROL	R3
+    002CD 0C22      LSL	R2
+    002CE 1C33      ROL	R3
+    002CF 9230 008B STS	tinteg_v_temp+1,R3
+    002D1 9220 008A STS	tinteg_v_temp,R2
+(0203) 						 post_1=1;answer=0x44;}
+    002D3 E081      LDI	R24,1
+    002D4 9380 019E STS	post_1,R24
+    002D6 E484      LDI	R24,0x44
+    002D7 9380 01A0 STS	answer,R24
+(0204)                          break;
+    002D9 C06E      RJMP	0x0348
+(0205) 			   case 0x40:
+(0206) 			            {perem&=0x0F; kos_i_temp=perem<<4;
+    002DA 9180 00A2 LDS	R24,perem
+    002DC 708F      ANDI	R24,0xF
+    002DD 9380 00A2 STS	perem,R24
+    002DF 2E28      MOV	R2,R24
+    002E0 2433      CLR	R3
+    002E1 0C22      LSL	R2
+    002E2 1C33      ROL	R3
+    002E3 0C22      LSL	R2
+    002E4 1C33      ROL	R3
+    002E5 0C22      LSL	R2
+    002E6 1C33      ROL	R3
+    002E7 0C22      LSL	R2
+    002E8 1C33      ROL	R3
+    002E9 9230 0091 STS	kos_i_temp+1,R3
+    002EB 9220 0090 STS	kos_i_temp,R2
+(0207) 						 post_1=1;answer=0x44;}
+    002ED E081      LDI	R24,1
+    002EE 9380 019E STS	post_1,R24
+    002F0 E484      LDI	R24,0x44
+    002F1 9380 01A0 STS	answer,R24
+(0208)                          break;
+    002F3 C054      RJMP	0x0348
+(0209) 			   case 0x50:
+(0210) 			            {perem&=0x0F; kos_v_temp=perem<<4;
+    002F4 9180 00A2 LDS	R24,perem
+    002F6 708F      ANDI	R24,0xF
+    002F7 9380 00A2 STS	perem,R24
+    002F9 2E28      MOV	R2,R24
+    002FA 2433      CLR	R3
+    002FB 0C22      LSL	R2
+    002FC 1C33      ROL	R3
+    002FD 0C22      LSL	R2
+    002FE 1C33      ROL	R3
+    002FF 0C22      LSL	R2
+    00300 1C33      ROL	R3
+    00301 0C22      LSL	R2
+    00302 1C33      ROL	R3
+    00303 9230 0093 STS	kos_v_temp+1,R3
+    00305 9220 0092 STS	kos_v_temp,R2
+(0211) 						 post_1=1;answer=0x44;}
+    00307 E081      LDI	R24,1
+    00308 9380 019E STS	post_1,R24
+    0030A E484      LDI	R24,0x44
+    0030B 9380 01A0 STS	answer,R24
+(0212)                          break;
+    0030D C03A      RJMP	0x0348
+(0213) 			   case 0x60:
+(0214) 			            {perem&=0x0F; fkvant_temp=perem<<4;
+    0030E 9180 00A2 LDS	R24,perem
+    00310 708F      ANDI	R24,0xF
+    00311 9380 00A2 STS	perem,R24
+    00313 2E28      MOV	R2,R24
+    00314 2433      CLR	R3
+    00315 0C22      LSL	R2
+    00316 1C33      ROL	R3
+    00317 0C22      LSL	R2
+    00318 1C33      ROL	R3
+    00319 0C22      LSL	R2
+    0031A 1C33      ROL	R3
+    0031B 0C22      LSL	R2
+    0031C 1C33      ROL	R3
+    0031D 9230 0099 STS	fkvant_temp+1,R3
+    0031F 9220 0098 STS	fkvant_temp,R2
+(0215) 						 post_1=1; answer=0x44;}
+    00321 E081      LDI	R24,1
+    00322 9380 019E STS	post_1,R24
+    00324 E484      LDI	R24,0x44
+    00325 9380 01A0 STS	answer,R24
+(0216)                          break;
+    00327 C020      RJMP	0x0348
+(0217) 			   case 0x70:
+(0218) 			            {perem&=0x0F; iupor_temp=perem<<4;
+    00328 9180 00A2 LDS	R24,perem
+    0032A 708F      ANDI	R24,0xF
+    0032B 9380 00A2 STS	perem,R24
+    0032D 2E28      MOV	R2,R24
+    0032E 2433      CLR	R3
+    0032F 0C22      LSL	R2
+    00330 1C33      ROL	R3
+    00331 0C22      LSL	R2
+    00332 1C33      ROL	R3
+    00333 0C22      LSL	R2
+    00334 1C33      ROL	R3
+    00335 0C22      LSL	R2
+    00336 1C33      ROL	R3
+    00337 9230 009B STS	iupor_temp+1,R3
+    00339 9220 009A STS	iupor_temp,R2
+(0219) 						 post_1=1;answer=0x44;}
+    0033B E081      LDI	R24,1
+    0033C 9380 019E STS	post_1,R24
+    0033E E484      LDI	R24,0x44
+    0033F 9380 01A0 STS	answer,R24
+(0220)                          break;
+    00341 C006      RJMP	0x0348
+(0221) 			   default: {post_1=0;answer=0x0F;}
+    00342 2422      CLR	R2
+    00343 9220 019E STS	post_1,R2
+    00345 E08F      LDI	R24,0xF
+    00346 9380 01A0 STS	answer,R24
+(0222) 			   }
+(0223) 		 }
+(0224) 		 perem=0;
+    00348 2422      CLR	R2
+    00349 9220 00A2 STS	perem,R2
+(0225) 		 break;
+    0034B C160      RJMP	0x04AC
+(0226)     case 1:
+(0227) 	    {
+(0228)  	  	perem=uart_data;
+    0034C 9020 019D LDS	R2,uart_data
+    0034E 9220 00A2 STS	perem,R2
+(0229) 		temp=uart_data&0xF0;
+    00350 2D82      MOV	R24,R2
+    00351 7F80      ANDI	R24,0xF0
+    00352 9380 00A1 STS	temp,R24
+(0230) 		switch(temp)
+    00354 2F08      MOV	R16,R24
+    00355 2711      CLR	R17
+    00356 3300      CPI	R16,0x30
+    00357 E0E0      LDI	R30,0
+    00358 071E      CPC	R17,R30
+    00359 F409      BNE	0x035B
+    0035A C09F      RJMP	0x03FA
+    0035B E380      LDI	R24,0x30
+    0035C E090      LDI	R25,0
+    0035D 1780      CP	R24,R16
+    0035E 0791      CPC	R25,R17
+    0035F F0A4      BLT	0x0374
+    00360 3100      CPI	R16,0x10
+    00361 E0E0      LDI	R30,0
+    00362 071E      CPC	R17,R30
+    00363 F409      BNE	0x0365
+    00364 C051      RJMP	0x03B6
+    00365 E180      LDI	R24,0x10
+    00366 E090      LDI	R25,0
+    00367 1780      CP	R24,R16
+    00368 0791      CPC	R25,R17
+    00369 F024      BLT	0x036E
+    0036A 3000      CPI	R16,0
+    0036B 0701      CPC	R16,R17
+    0036C F139      BEQ	0x0394
+    0036D C138      RJMP	0x04A6
+    0036E 3200      CPI	R16,0x20
+    0036F E0E0      LDI	R30,0
+    00370 071E      CPC	R17,R30
+    00371 F409      BNE	0x0373
+    00372 C065      RJMP	0x03D8
+    00373 C132      RJMP	0x04A6
+    00374 3500      CPI	R16,0x50
+    00375 E0E0      LDI	R30,0
+    00376 071E      CPC	R17,R30
+    00377 F409      BNE	0x0379
+    00378 C0C5      RJMP	0x043E
+    00379 E580      LDI	R24,0x50
+    0037A E090      LDI	R25,0
+    0037B 1780      CP	R24,R16
+    0037C 0791      CPC	R25,R17
+    0037D F034      BLT	0x0384
+    0037E 3400      CPI	R16,0x40
+    0037F E0E0      LDI	R30,0
+    00380 071E      CPC	R17,R30
+    00381 F409      BNE	0x0383
+    00382 C099      RJMP	0x041C
+    00383 C122      RJMP	0x04A6
+    00384 3600      CPI	R16,0x60
+    00385 E0E0      LDI	R30,0
+    00386 071E      CPC	R17,R30
+    00387 F409      BNE	0x0389
+    00388 C0D7      RJMP	0x0460
+    00389 3600      CPI	R16,0x60
+    0038A E0E0      LDI	R30,0
+    0038B 071E      CPC	R17,R30
+    0038C F40C      BGE	0x038E
+    0038D C118      RJMP	0x04A6
+    0038E 3700      CPI	R16,0x70
+    0038F E0E0      LDI	R30,0
+    00390 071E      CPC	R17,R30
+    00391 F409      BNE	0x0393
+    00392 C0F1      RJMP	0x0484
+    00393 C112      RJMP	0x04A6
+(0231) 			   {
+(0232) 			   case 0x00: {perem&=0x0F; kprop_i_temp|=perem;
+    00394 9180 00A2 LDS	R24,perem
+    00396 708F      ANDI	R24,0xF
+    00397 9380 00A2 STS	perem,R24
+    00399 2E28      MOV	R2,R24
+    0039A 2433      CLR	R3
+    0039B 9040 007E LDS	R4,kprop_i_temp
+    0039D 9050 007F LDS	R5,kprop_i_temp+1
+    0039F 2842      OR	R4,R2
+    003A0 2853      OR	R5,R3
+    003A1 9250 007F STS	kprop_i_temp+1,R5
+    003A3 9240 007E STS	kprop_i_temp,R4
+(0233) 			               kprop_i=kprop_i_temp;
+    003A5 0112      MOVW	R2,R4
+    003A6 9230 0085 STS	kprop_i+1,R3
+    003A8 9220 0084 STS	kprop_i,R2
+(0234) 						   kprop_i_temp=0;
+    003AA 2422      CLR	R2
+    003AB 2433      CLR	R3
+    003AC 9230 007F STS	kprop_i_temp+1,R3
+    003AE 9220 007E STS	kprop_i_temp,R2
+(0235) 						   answer=0x55;post_1=0;}
+    003B0 E585      LDI	R24,0x55
+    003B1 9380 01A0 STS	answer,R24
+    003B3 9220 019E STS	post_1,R2
+(0236)                            break;
+    003B5 C0F6      RJMP	0x04AC
+(0237) 			   case 0x10: {perem&=0x0F; tinteg_i_temp|=perem;
+    003B6 9180 00A2 LDS	R24,perem
+    003B8 708F      ANDI	R24,0xF
+    003B9 9380 00A2 STS	perem,R24
+    003BB 2E28      MOV	R2,R24
+    003BC 2433      CLR	R3
+    003BD 9040 0080 LDS	R4,tinteg_i_temp
+    003BF 9050 0081 LDS	R5,tinteg_i_temp+1
+    003C1 2842      OR	R4,R2
+    003C2 2853      OR	R5,R3
+    003C3 9250 0081 STS	tinteg_i_temp+1,R5
+    003C5 9240 0080 STS	tinteg_i_temp,R4
+(0238) 			               tinteg_i=tinteg_i_temp;
+    003C7 0112      MOVW	R2,R4
+    003C8 9230 0087 STS	tinteg_i+1,R3
+    003CA 9220 0086 STS	tinteg_i,R2
+(0239) 						   tinteg_i_temp=0;
+    003CC 2422      CLR	R2
+    003CD 2433      CLR	R3
+    003CE 9230 0081 STS	tinteg_i_temp+1,R3
+    003D0 9220 0080 STS	tinteg_i_temp,R2
+(0240) 						   answer=0x55;post_1=0;}
+    003D2 E585      LDI	R24,0x55
+    003D3 9380 01A0 STS	answer,R24
+    003D5 9220 019E STS	post_1,R2
+(0241)                            break;
+    003D7 C0D4      RJMP	0x04AC
+(0242) 			   case 0x20: {perem&=0x0F; kprop_v_temp|=perem;
+    003D8 9180 00A2 LDS	R24,perem
+    003DA 708F      ANDI	R24,0xF
+    003DB 9380 00A2 STS	perem,R24
+    003DD 2E28      MOV	R2,R24
+    003DE 2433      CLR	R3
+    003DF 9040 0088 LDS	R4,kprop_v_temp
+    003E1 9050 0089 LDS	R5,kprop_v_temp+1
+    003E3 2842      OR	R4,R2
+    003E4 2853      OR	R5,R3
+    003E5 9250 0089 STS	kprop_v_temp+1,R5
+    003E7 9240 0088 STS	kprop_v_temp,R4
+(0243) 			               kprop_v=kprop_v_temp;
+    003E9 0112      MOVW	R2,R4
+    003EA 9230 008D STS	kprop_v+1,R3
+    003EC 9220 008C STS	kprop_v,R2
+(0244) 						   kprop_v_temp=0;
+    003EE 2422      CLR	R2
+    003EF 2433      CLR	R3
+    003F0 9230 0089 STS	kprop_v_temp+1,R3
+    003F2 9220 0088 STS	kprop_v_temp,R2
+(0245) 						   answer=0x55;post_1=0;}
+    003F4 E585      LDI	R24,0x55
+    003F5 9380 01A0 STS	answer,R24
+    003F7 9220 019E STS	post_1,R2
+(0246)                            break;
+    003F9 C0B2      RJMP	0x04AC
+(0247) 			   case 0x30: {perem&=0x0F; tinteg_v_temp|=perem;
+    003FA 9180 00A2 LDS	R24,perem
+    003FC 708F      ANDI	R24,0xF
+    003FD 9380 00A2 STS	perem,R24
+    003FF 2E28      MOV	R2,R24
+    00400 2433      CLR	R3
+    00401 9040 008A LDS	R4,tinteg_v_temp
+    00403 9050 008B LDS	R5,tinteg_v_temp+1
+    00405 2842      OR	R4,R2
+    00406 2853      OR	R5,R3
+    00407 9250 008B STS	tinteg_v_temp+1,R5
+    00409 9240 008A STS	tinteg_v_temp,R4
+(0248) 			               tinteg_v=tinteg_v_temp;
+    0040B 0112      MOVW	R2,R4
+    0040C 9230 008F STS	tinteg_v+1,R3
+    0040E 9220 008E STS	tinteg_v,R2
+(0249) 						   tinteg_v_temp=0;
+    00410 2422      CLR	R2
+    00411 2433      CLR	R3
+    00412 9230 008B STS	tinteg_v_temp+1,R3
+    00414 9220 008A STS	tinteg_v_temp,R2
+(0250) 						   answer=0x55;post_1=0;}
+    00416 E585      LDI	R24,0x55
+    00417 9380 01A0 STS	answer,R24
+    00419 9220 019E STS	post_1,R2
+(0251)                            break;
+    0041B C090      RJMP	0x04AC
+(0252) 			   case 0x40: {perem&=0x0F; kos_i_temp|=perem;
+    0041C 9180 00A2 LDS	R24,perem
+    0041E 708F      ANDI	R24,0xF
+    0041F 9380 00A2 STS	perem,R24
+    00421 2E28      MOV	R2,R24
+    00422 2433      CLR	R3
+    00423 9040 0090 LDS	R4,kos_i_temp
+    00425 9050 0091 LDS	R5,kos_i_temp+1
+    00427 2842      OR	R4,R2
+    00428 2853      OR	R5,R3
+    00429 9250 0091 STS	kos_i_temp+1,R5
+    0042B 9240 0090 STS	kos_i_temp,R4
+(0253) 			               kos_i=kos_i_temp;
+    0042D 0112      MOVW	R2,R4
+    0042E 9230 0095 STS	kos_i+1,R3
+    00430 9220 0094 STS	kos_i,R2
+(0254) 						   kos_i_temp=0;
+    00432 2422      CLR	R2
+    00433 2433      CLR	R3
+    00434 9230 0091 STS	kos_i_temp+1,R3
+    00436 9220 0090 STS	kos_i_temp,R2
+(0255) 						   answer=0x55;post_1=0;}
+    00438 E585      LDI	R24,0x55
+    00439 9380 01A0 STS	answer,R24
+    0043B 9220 019E STS	post_1,R2
+(0256)                            break;
+    0043D C06E      RJMP	0x04AC
+(0257) 			   case 0x50: {perem&=0x0F; kos_v_temp|=perem;
+    0043E 9180 00A2 LDS	R24,perem
+    00440 708F      ANDI	R24,0xF
+    00441 9380 00A2 STS	perem,R24
+    00443 2E28      MOV	R2,R24
+    00444 2433      CLR	R3
+    00445 9040 0092 LDS	R4,kos_v_temp
+    00447 9050 0093 LDS	R5,kos_v_temp+1
+    00449 2842      OR	R4,R2
+    0044A 2853      OR	R5,R3
+    0044B 9250 0093 STS	kos_v_temp+1,R5
+    0044D 9240 0092 STS	kos_v_temp,R4
+(0258) 			               kos_v=kos_v_temp;
+    0044F 0112      MOVW	R2,R4
+    00450 9230 0097 STS	kos_v+1,R3
+    00452 9220 0096 STS	kos_v,R2
+(0259) 						   kos_v_temp=0;
+    00454 2422      CLR	R2
+    00455 2433      CLR	R3
+    00456 9230 0093 STS	kos_v_temp+1,R3
+    00458 9220 0092 STS	kos_v_temp,R2
+(0260) 						   answer=0x55;post_1=0;}
+    0045A E585      LDI	R24,0x55
+    0045B 9380 01A0 STS	answer,R24
+    0045D 9220 019E STS	post_1,R2
+(0261)                            break;
+    0045F C04C      RJMP	0x04AC
+(0262) 			   case 0x60: {perem&=0x0F; fkvant_temp|=perem;
+    00460 9180 00A2 LDS	R24,perem
+    00462 708F      ANDI	R24,0xF
+    00463 9380 00A2 STS	perem,R24
+    00465 2E28      MOV	R2,R24
+    00466 2433      CLR	R3
+    00467 9040 0098 LDS	R4,fkvant_temp
+    00469 9050 0099 LDS	R5,fkvant_temp+1
+    0046B 2842      OR	R4,R2
+    0046C 2853      OR	R5,R3
+    0046D 9250 0099 STS	fkvant_temp+1,R5
+    0046F 9240 0098 STS	fkvant_temp,R4
+(0263) 			               fkvant=fkvant_temp;
+    00471 0112      MOVW	R2,R4
+    00472 9230 009D STS	fkvant+1,R3
+    00474 9220 009C STS	fkvant,R2
+(0264) 						   fkvant_temp=0;
+    00476 2422      CLR	R2
+    00477 2433      CLR	R3
+    00478 9230 0099 STS	fkvant_temp+1,R3
+    0047A 9220 0098 STS	fkvant_temp,R2
+(0265) 						   perem=0;
+    0047C 9220 00A2 STS	perem,R2
+(0266) 						   answer=0x55;post_1=0;}
+    0047E E585      LDI	R24,0x55
+    0047F 9380 01A0 STS	answer,R24
+    00481 9220 019E STS	post_1,R2
+(0267)                            break;
+    00483 C028      RJMP	0x04AC
+(0268) 			   case 0x70: {perem&=0x0F; iupor_temp|=perem;
+    00484 9180 00A2 LDS	R24,perem
+    00486 708F      ANDI	R24,0xF
+    00487 9380 00A2 STS	perem,R24
+    00489 2E28      MOV	R2,R24
+    0048A 2433      CLR	R3
+    0048B 9040 009A LDS	R4,iupor_temp
+    0048D 9050 009B LDS	R5,iupor_temp+1
+    0048F 2842      OR	R4,R2
+    00490 2853      OR	R5,R3
+    00491 9250 009B STS	iupor_temp+1,R5
+    00493 9240 009A STS	iupor_temp,R4
+(0269) 			               iupor=iupor_temp;
+    00495 0112      MOVW	R2,R4
+    00496 9230 009F STS	iupor+1,R3
+    00498 9220 009E STS	iupor,R2
+(0270) 						   iupor_temp=0;
+    0049A 2422      CLR	R2
+    0049B 2433      CLR	R3
+    0049C 9230 009B STS	iupor_temp+1,R3
+    0049E 9220 009A STS	iupor_temp,R2
+(0271) 						   answer=0x55;post_1=0;}
+    004A0 E585      LDI	R24,0x55
+    004A1 9380 01A0 STS	answer,R24
+    004A3 9220 019E STS	post_1,R2
+(0272)                            break;
+    004A5 C006      RJMP	0x04AC
+(0273) 		       default: {post_1=1;answer=0x0F;}
+    004A6 E081      LDI	R24,1
+    004A7 9380 019E STS	post_1,R24
+    004A9 E08F      LDI	R24,0xF
+    004AA 9380 01A0 STS	answer,R24
+(0274) 			   }
+(0275) 		 }
+(0276) 		 break;
+    004AC 9508      RET
+_post2:
+    004AD 934A      ST	-Y,R20
+    004AE 935A      ST	-Y,R21
+(0277)     }
+(0278) }
+(0279) void post2(void)
+(0280) {
+(0281) switch(post_2)
+    004AF 9140 019F LDS	R20,post_2
+    004B1 2755      CLR	R21
+    004B2 3041      CPI	R20,1
+    004B3 E0E0      LDI	R30,0
+    004B4 075E      CPC	R21,R30
+    004B5 F40C      BGE	0x04B7
+    004B6 C1E8      RJMP	0x069F
+    004B7 E08F      LDI	R24,0xF
+    004B8 E090      LDI	R25,0
+    004B9 1784      CP	R24,R20
+    004BA 0795      CPC	R25,R21
+    004BB F40C      BGE	0x04BD
+    004BC C1E2      RJMP	0x069F
+    004BD E584      LDI	R24,0x54
+    004BE E090      LDI	R25,0
+    004BF 01FA      MOVW	R30,R20
+    004C0 9731      SBIW	R30,1
+    004C1 0FEE      LSL	R30
+    004C2 1FFF      ROL	R31
+    004C3 0FE8      ADD	R30,R24
+    004C4 1FF9      ADC	R31,R25
+    004C5 9025      LPM	R2,Z+
+    004C6 9034      LPM	R3,Z
+    004C7 01F1      MOVW	R30,R2
+    004C8 9409      IJMP
+(0282)                                  {
+(0283)                                  case 1:
+(0284) 								       perem=uart_data;
+    004C9 9020 019D LDS	R2,uart_data
+    004CB 9220 00A2 STS	perem,R2
+(0285) 								       temp=uart_data&0xF0;
+    004CD 2D82      MOV	R24,R2
+    004CE 7F80      ANDI	R24,0xF0
+    004CF 9380 00A1 STS	temp,R24
+(0286)  	  	                               if(temp==0x80) 
+    004D1 3880      CPI	R24,0x80
+    004D2 F4A9      BNE	0x04E8
+(0287) 									         {perem&=0x0F; alfa_temp=perem<<12;
+    004D3 2D82      MOV	R24,R2
+    004D4 708F      ANDI	R24,0xF
+    004D5 9380 00A2 STS	perem,R24
+    004D7 E02C      LDI	R18,0xC
+    004D8 E030      LDI	R19,0
+    004D9 2F08      MOV	R16,R24
+    004DA 2711      CLR	R17
+    004DB 940E 0EA5 CALL	lsl16
+    004DD 9310 0075 STS	alfa_temp+1,R17
+    004DF 9300 0074 STS	alfa_temp,R16
+(0288) 										                  post_2=2;answer=0x80;}
+    004E1 E082      LDI	R24,2
+    004E2 9380 019F STS	post_2,R24
+    004E4 E880      LDI	R24,0x80
+    004E5 9380 01A0 STS	answer,R24
+    004E7 C1B7      RJMP	0x069F
+(0289) 		                               else			     {post_2=1;answer=0xFF;}
+    004E8 E081      LDI	R24,1
+    004E9 9380 019F STS	post_2,R24
+    004EB EF8F      LDI	R24,0xFF
+    004EC 9380 01A0 STS	answer,R24
+(0290)                                        break;
+    004EE C1B0      RJMP	0x069F
+(0291)                                  case 2:
+(0292) 								       perem=uart_data&0x0F;
+    004EF 9180 019D LDS	R24,uart_data
+    004F1 708F      ANDI	R24,0xF
+    004F2 9380 00A2 STS	perem,R24
+(0293)  	  	                               alfa_temp|=perem<<8;
+    004F4 2E28      MOV	R2,R24
+    004F5 2433      CLR	R3
+    004F6 2C32      MOV	R3,R2
+    004F7 2422      CLR	R2
+    004F8 9040 0074 LDS	R4,alfa_temp
+    004FA 9050 0075 LDS	R5,alfa_temp+1
+    004FC 2842      OR	R4,R2
+    004FD 2853      OR	R5,R3
+    004FE 9250 0075 STS	alfa_temp+1,R5
+    00500 9240 0074 STS	alfa_temp,R4
+(0294) 		                               post_2=3;
+    00502 E083      LDI	R24,3
+    00503 9380 019F STS	post_2,R24
+(0295) 		                               answer=0x80;
+    00505 E880      LDI	R24,0x80
+    00506 9380 01A0 STS	answer,R24
+(0296)                                        break;
+    00508 C196      RJMP	0x069F
+(0297) 								 case 3:
+(0298) 								       perem=uart_data&0x0F;
+    00509 9180 019D LDS	R24,uart_data
+    0050B 708F      ANDI	R24,0xF
+    0050C 9380 00A2 STS	perem,R24
+(0299)  	  	                               alfa_temp|=perem<<4;
+    0050E 2E28      MOV	R2,R24
+    0050F 2433      CLR	R3
+    00510 0C22      LSL	R2
+    00511 1C33      ROL	R3
+    00512 0C22      LSL	R2
+    00513 1C33      ROL	R3
+    00514 0C22      LSL	R2
+    00515 1C33      ROL	R3
+    00516 0C22      LSL	R2
+    00517 1C33      ROL	R3
+    00518 9040 0074 LDS	R4,alfa_temp
+    0051A 9050 0075 LDS	R5,alfa_temp+1
+    0051C 2842      OR	R4,R2
+    0051D 2853      OR	R5,R3
+    0051E 9250 0075 STS	alfa_temp+1,R5
+    00520 9240 0074 STS	alfa_temp,R4
+(0300) 		                               post_2=4;
+    00522 E084      LDI	R24,4
+    00523 9380 019F STS	post_2,R24
+(0301) 		                               answer=0x80;
+    00525 E880      LDI	R24,0x80
+    00526 9380 01A0 STS	answer,R24
+(0302)                                        break;
+    00528 C176      RJMP	0x069F
+(0303)                                  case 4:
+(0304) 								       perem=uart_data&0x0F;
+    00529 9180 019D LDS	R24,uart_data
+    0052B 708F      ANDI	R24,0xF
+    0052C 9380 00A2 STS	perem,R24
+(0305)  	  	                               alfa_temp|=perem;
+    0052E 2E28      MOV	R2,R24
+    0052F 2433      CLR	R3
+    00530 9040 0074 LDS	R4,alfa_temp
+    00532 9050 0075 LDS	R5,alfa_temp+1
+    00534 2842      OR	R4,R2
+    00535 2853      OR	R5,R3
+    00536 9250 0075 STS	alfa_temp+1,R5
+    00538 9240 0074 STS	alfa_temp,R4
+(0306) 		                               alfa_i=alfa_temp;
+    0053A 0112      MOVW	R2,R4
+    0053B 9230 0073 STS	alfa_i+1,R3
+    0053D 9220 0072 STS	alfa_i,R2
+(0307) 		                               alfa_temp=0;
+    0053F 2422      CLR	R2
+    00540 2433      CLR	R3
+    00541 9230 0075 STS	alfa_temp+1,R3
+    00543 9220 0074 STS	alfa_temp,R2
+(0308) 		                               post_2=5;
+    00545 E085      LDI	R24,5
+    00546 9380 019F STS	post_2,R24
+(0309) 		                               answer=0x80;
+    00548 E880      LDI	R24,0x80
+    00549 9380 01A0 STS	answer,R24
+(0310)                                        break;
+    0054B C153      RJMP	0x069F
+(0311)                                  case 5:
+(0312)  	  	                               perem=uart_data;
+    0054C 9020 019D LDS	R2,uart_data
+    0054E 9220 00A2 STS	perem,R2
+(0313) 								       temp=uart_data&0xF0;
+    00550 2D82      MOV	R24,R2
+    00551 7F80      ANDI	R24,0xF0
+    00552 9380 00A1 STS	temp,R24
+(0314)  	  	                               if(temp==0x90) 
+    00554 3980      CPI	R24,0x90
+    00555 F4A9      BNE	0x056B
+(0315) 									         {perem&=0x0F; tok_temp=perem<<12;
+    00556 2D82      MOV	R24,R2
+    00557 708F      ANDI	R24,0xF
+    00558 9380 00A2 STS	perem,R24
+    0055A E02C      LDI	R18,0xC
+    0055B E030      LDI	R19,0
+    0055C 2F08      MOV	R16,R24
+    0055D 2711      CLR	R17
+    0055E 940E 0EA5 CALL	lsl16
+    00560 9310 007B STS	tok_temp+1,R17
+    00562 9300 007A STS	tok_temp,R16
+(0316) 										                  post_2=6;answer=0x90;}
+    00564 E086      LDI	R24,6
+    00565 9380 019F STS	post_2,R24
+    00567 E980      LDI	R24,0x90
+    00568 9380 01A0 STS	answer,R24
+    0056A C134      RJMP	0x069F
+(0317) 		                               else			     {post_2=5;answer=0xFF;}
+    0056B E085      LDI	R24,5
+    0056C 9380 019F STS	post_2,R24
+    0056E EF8F      LDI	R24,0xFF
+    0056F 9380 01A0 STS	answer,R24
+(0318)                                        break;
+    00571 C12D      RJMP	0x069F
+(0319)                                  case 6:
+(0320)  	  	                               perem=uart_data&0x0F;
+    00572 9180 019D LDS	R24,uart_data
+    00574 708F      ANDI	R24,0xF
+    00575 9380 00A2 STS	perem,R24
+(0321)  	  	                               tok_temp|=perem<<8;
+    00577 2E28      MOV	R2,R24
+    00578 2433      CLR	R3
+    00579 2C32      MOV	R3,R2
+    0057A 2422      CLR	R2
+    0057B 9040 007A LDS	R4,tok_temp
+    0057D 9050 007B LDS	R5,tok_temp+1
+    0057F 2842      OR	R4,R2
+    00580 2853      OR	R5,R3
+    00581 9250 007B STS	tok_temp+1,R5
+    00583 9240 007A STS	tok_temp,R4
+(0322) 		                               post_2=7;
+    00585 E087      LDI	R24,7
+    00586 9380 019F STS	post_2,R24
+(0323) 		                               answer=0x90;
+    00588 E980      LDI	R24,0x90
+    00589 9380 01A0 STS	answer,R24
+(0324)                                        break;
+    0058B C113      RJMP	0x069F
+(0325)                                  case 7:
+(0326)  	  	                               perem=uart_data&0x0F;
+    0058C 9180 019D LDS	R24,uart_data
+    0058E 708F      ANDI	R24,0xF
+    0058F 9380 00A2 STS	perem,R24
+(0327)  	  	                               tok_temp|=perem<<4;
+    00591 2E28      MOV	R2,R24
+    00592 2433      CLR	R3
+    00593 0C22      LSL	R2
+    00594 1C33      ROL	R3
+    00595 0C22      LSL	R2
+    00596 1C33      ROL	R3
+    00597 0C22      LSL	R2
+    00598 1C33      ROL	R3
+    00599 0C22      LSL	R2
+    0059A 1C33      ROL	R3
+    0059B 9040 007A LDS	R4,tok_temp
+    0059D 9050 007B LDS	R5,tok_temp+1
+    0059F 2842      OR	R4,R2
+    005A0 2853      OR	R5,R3
+    005A1 9250 007B STS	tok_temp+1,R5
+    005A3 9240 007A STS	tok_temp,R4
+(0328) 		                               post_2=8;
+    005A5 E088      LDI	R24,0x8
+    005A6 9380 019F STS	post_2,R24
+(0329) 		                               answer=0x90;
+    005A8 E980      LDI	R24,0x90
+    005A9 9380 01A0 STS	answer,R24
+(0330)                                        break;
+    005AB C0F3      RJMP	0x069F
+(0331) 							     case 8:
+(0332) 								       perem=uart_data&0x0F;
+    005AC 9180 019D LDS	R24,uart_data
+    005AE 708F      ANDI	R24,0xF
+    005AF 9380 00A2 STS	perem,R24
+(0333)  	  	                               tok_temp|=perem;
+    005B1 2E28      MOV	R2,R24
+    005B2 2433      CLR	R3
+    005B3 9040 007A LDS	R4,tok_temp
+    005B5 9050 007B LDS	R5,tok_temp+1
+    005B7 2842      OR	R4,R2
+    005B8 2853      OR	R5,R3
+    005B9 9250 007B STS	tok_temp+1,R5
+    005BB 9240 007A STS	tok_temp,R4
+(0334) 		                               tok_i=tok_temp;
+    005BD 0112      MOVW	R2,R4
+    005BE 9230 0077 STS	tok_i+1,R3
+    005C0 9220 0076 STS	tok_i,R2
+(0335) 		                               tok_temp=0;
+    005C2 2422      CLR	R2
+    005C3 2433      CLR	R3
+    005C4 9230 007B STS	tok_temp+1,R3
+    005C6 9220 007A STS	tok_temp,R2
+(0336) 		                               post_2=9;
+    005C8 E089      LDI	R24,0x9
+    005C9 9380 019F STS	post_2,R24
+(0337) 		                               answer=0x90;
+    005CB E980      LDI	R24,0x90
+    005CC 9380 01A0 STS	answer,R24
+(0338)                                        break;
+    005CE C0D0      RJMP	0x069F
+(0339)                                  case 9:
+(0340)  	  	                               tmp=UDR;
+    005CF B02C      IN	R2,0x0C
+    005D0 9220 00A0 STS	tmp,R2
+(0341) 									   tmp&=0x0F;
+    005D2 2D82      MOV	R24,R2
+    005D3 708F      ANDI	R24,0xF
+    005D4 9380 00A0 STS	tmp,R24
+(0342) 		                               if((tmp==0x00)||(tmp==0x01)) 
+    005D6 2E28      MOV	R2,R24
+    005D7 2388      TST	R24
+    005D8 F011      BEQ	0x05DB
+    005D9 3081      CPI	R24,1
+    005DA F459      BNE	0x05E6
+(0343) 		                               {post_2=10;answer=0x90;sign_current=tmp;}
+    005DB E08A      LDI	R24,0xA
+    005DC 9380 019F STS	post_2,R24
+    005DE E980      LDI	R24,0x90
+    005DF 9380 01A0 STS	answer,R24
+    005E1 9020 00A0 LDS	R2,tmp
+    005E3 9220 01A9 STS	sign_current,R2
+    005E5 C0B9      RJMP	0x069F
+(0344) 		                               else	 {post_2=9;answer=0xFF;}
+    005E6 E089      LDI	R24,0x9
+    005E7 9380 019F STS	post_2,R24
+    005E9 EF8F      LDI	R24,0xFF
+    005EA 9380 01A0 STS	answer,R24
+(0345)                                        break;
+    005EC C0B2      RJMP	0x069F
+(0346)                                  case 10:
+(0347)  	  	                               perem=uart_data;
+    005ED 9020 019D LDS	R2,uart_data
+    005EF 9220 00A2 STS	perem,R2
+(0348) 								       temp=uart_data&0xF0;
+    005F1 2D82      MOV	R24,R2
+    005F2 7F80      ANDI	R24,0xF0
+    005F3 9380 00A1 STS	temp,R24
+(0349)  	  	                               if(temp==0xA0) 
+    005F5 3A80      CPI	R24,0xA0
+    005F6 F4A9      BNE	0x060C
+(0350) 									         {perem&=0x0F; volt_temp=perem<<12;
+    005F7 2D82      MOV	R24,R2
+    005F8 708F      ANDI	R24,0xF
+    005F9 9380 00A2 STS	perem,R24
+    005FB E02C      LDI	R18,0xC
+    005FC E030      LDI	R19,0
+    005FD 2F08      MOV	R16,R24
+    005FE 2711      CLR	R17
+    005FF 940E 0EA5 CALL	lsl16
+    00601 9310 007D STS	volt_temp+1,R17
+    00603 9300 007C STS	volt_temp,R16
+(0351) 										                 post_2=11;answer=0xA0;}
+    00605 E08B      LDI	R24,0xB
+    00606 9380 019F STS	post_2,R24
+    00608 EA80      LDI	R24,0xA0
+    00609 9380 01A0 STS	answer,R24
+    0060B C093      RJMP	0x069F
+(0352) 		                               else			    {post_2=10;answer=0xFF;}
+    0060C E08A      LDI	R24,0xA
+    0060D 9380 019F STS	post_2,R24
+    0060F EF8F      LDI	R24,0xFF
+    00610 9380 01A0 STS	answer,R24
+(0353)                                        break;
+    00612 C08C      RJMP	0x069F
+(0354)                                  case 11:
+(0355)  	  	                               perem=uart_data&0x0F;
+    00613 9180 019D LDS	R24,uart_data
+    00615 708F      ANDI	R24,0xF
+    00616 9380 00A2 STS	perem,R24
+(0356)  	  	                               volt_temp|=perem<<8;
+    00618 2E28      MOV	R2,R24
+    00619 2433      CLR	R3
+    0061A 2C32      MOV	R3,R2
+    0061B 2422      CLR	R2
+    0061C 9040 007C LDS	R4,volt_temp
+    0061E 9050 007D LDS	R5,volt_temp+1
+    00620 2842      OR	R4,R2
+    00621 2853      OR	R5,R3
+    00622 9250 007D STS	volt_temp+1,R5
+    00624 9240 007C STS	volt_temp,R4
+(0357) 		                               post_2=12;
+    00626 E08C      LDI	R24,0xC
+    00627 9380 019F STS	post_2,R24
+(0358) 		                               answer=0xA0;
+    00629 EA80      LDI	R24,0xA0
+    0062A 9380 01A0 STS	answer,R24
+(0359)                                        break;
+    0062C C072      RJMP	0x069F
+(0360)                                  case 12:
+(0361)  	                                   perem=uart_data&0x0F;
+    0062D 9180 019D LDS	R24,uart_data
+    0062F 708F      ANDI	R24,0xF
+    00630 9380 00A2 STS	perem,R24
+(0362)  	  	                               volt_temp|=perem<<4;
+    00632 2E28      MOV	R2,R24
+    00633 2433      CLR	R3
+    00634 0C22      LSL	R2
+    00635 1C33      ROL	R3
+    00636 0C22      LSL	R2
+    00637 1C33      ROL	R3
+    00638 0C22      LSL	R2
+    00639 1C33      ROL	R3
+    0063A 0C22      LSL	R2
+    0063B 1C33      ROL	R3
+    0063C 9040 007C LDS	R4,volt_temp
+    0063E 9050 007D LDS	R5,volt_temp+1
+    00640 2842      OR	R4,R2
+    00641 2853      OR	R5,R3
+    00642 9250 007D STS	volt_temp+1,R5
+    00644 9240 007C STS	volt_temp,R4
+(0363) 		                               post_2=13;
+    00646 E08D      LDI	R24,0xD
+    00647 9380 019F STS	post_2,R24
+(0364) 		                               answer=0xA0;
+    00649 EA80      LDI	R24,0xA0
+    0064A 9380 01A0 STS	answer,R24
+(0365)                                        break;
+    0064C C052      RJMP	0x069F
+(0366) 							     case 13:
+(0367) 								       perem=uart_data&0x0F;
+    0064D 9180 019D LDS	R24,uart_data
+    0064F 708F      ANDI	R24,0xF
+    00650 9380 00A2 STS	perem,R24
+(0368)  	  	                               volt_temp|=perem;
+    00652 2E28      MOV	R2,R24
+    00653 2433      CLR	R3
+    00654 9040 007C LDS	R4,volt_temp
+    00656 9050 007D LDS	R5,volt_temp+1
+    00658 2842      OR	R4,R2
+    00659 2853      OR	R5,R3
+    0065A 9250 007D STS	volt_temp+1,R5
+    0065C 9240 007C STS	volt_temp,R4
+(0369) 		                               volt_i=volt_temp;
+    0065E 0112      MOVW	R2,R4
+    0065F 9230 0079 STS	volt_i+1,R3
+    00661 9220 0078 STS	volt_i,R2
+(0370) 		                               volt_temp=0;
+    00663 2422      CLR	R2
+    00664 2433      CLR	R3
+    00665 9230 007D STS	volt_temp+1,R3
+    00667 9220 007C STS	volt_temp,R2
+(0371) 		                               post_2=14;
+    00669 E08E      LDI	R24,0xE
+    0066A 9380 019F STS	post_2,R24
+(0372) 		                               answer=0xA0;
+    0066C EA80      LDI	R24,0xA0
+    0066D 9380 01A0 STS	answer,R24
+(0373)                                        break;
+    0066F C02F      RJMP	0x069F
+(0374)                                  case 14:
+(0375)  	  	                               tmp=UDR;
+    00670 B02C      IN	R2,0x0C
+    00671 9220 00A0 STS	tmp,R2
+(0376) 									   tmp&=0x0F;
+    00673 2D82      MOV	R24,R2
+    00674 708F      ANDI	R24,0xF
+    00675 9380 00A0 STS	tmp,R24
+(0377) 		                               if((tmp==0x00)||(tmp==0x01)) 
+    00677 2E28      MOV	R2,R24
+    00678 2388      TST	R24
+    00679 F011      BEQ	0x067C
+    0067A 3081      CPI	R24,1
+    0067B F459      BNE	0x0687
+(0378) 		                                {post_2=15;answer=0xA0;sign_voltage=tmp;}
+    0067C E08F      LDI	R24,0xF
+    0067D 9380 019F STS	post_2,R24
+    0067F EA80      LDI	R24,0xA0
+    00680 9380 01A0 STS	answer,R24
+    00682 9020 00A0 LDS	R2,tmp
+    00684 9220 01A8 STS	sign_voltage,R2
+    00686 C018      RJMP	0x069F
+(0379) 		                               else	 {post_2=14;answer=0xFF;}
+    00687 E08E      LDI	R24,0xE
+    00688 9380 019F STS	post_2,R24
+    0068A EF8F      LDI	R24,0xFF
+    0068B 9380 01A0 STS	answer,R24
+(0380)                                        break;
+    0068D C011      RJMP	0x069F
+(0381)                                  case 15:
+(0382)  	  	                             if(uart_data==0xCC) {post_2=0;answer=0xCC;}
+    0068E 9180 019D LDS	R24,uart_data
+    00690 3C8C      CPI	R24,0xCC
+    00691 F439      BNE	0x0699
+    00692 2422      CLR	R2
+    00693 9220 019F STS	post_2,R2
+    00695 EC8C      LDI	R24,0xCC
+    00696 9380 01A0 STS	answer,R24
+    00698 C006      RJMP	0x069F
+(0383) 		                               else	 {post_2=15;answer=0xFF;} 
+    00699 E08F      LDI	R24,0xF
+    0069A 9380 019F STS	post_2,R24
+    0069C EF8F      LDI	R24,0xFF
+    0069D 9380 01A0 STS	answer,R24
+(0384)                                        break;
+    0069F 9159      LD	R21,Y+
+    006A0 9149      LD	R20,Y+
+    006A1 9508      RET
+(0385)                                  }
+(0386) }
+(0387) void transmit_data(void)
+(0388) {
+(0389)  if((UCSRA&0x20)==0x20)//data register empty
+_transmit_data:
+    006A2 B18B      IN	R24,0x0B
+    006A3 7280      ANDI	R24,0x20
+    006A4 3280      CPI	R24,0x20
+    006A5 F431      BNE	0x06AC
+(0390)   {
+(0391)   UDR=answer;
+    006A6 9020 01A0 LDS	R2,answer
+    006A8 B82C      OUT	0x0C,R2
+(0392)   answer=0;
+    006A9 2422      CLR	R2
+    006AA 9220 01A0 STS	answer,R2
+(0393)    
+(0394)   } 
+    006AC 9508      RET
+(0395)  }
+(0396) 
+(0397) void data_ts(void)
+(0398)  {
+(0399)  if(start_ts==0)
+_data_ts:
+    006AD 9020 0061 LDS	R2,start_ts
+    006AF 2022      TST	R2
+    006B0 F539      BNE	0x06D8
+(0400)   {
+(0401)   start_ts=1;
+    006B1 E081      LDI	R24,1
+    006B2 9380 0061 STS	start_ts,R24
+(0402)   switch(gain)
+    006B4 9100 0062 LDS	R16,gain
+    006B6 2711      CLR	R17
+    006B7 3001      CPI	R16,1
+    006B8 E0E0      LDI	R30,0
+    006B9 071E      CPC	R17,R30
+    006BA F049      BEQ	0x06C4
+    006BB 3002      CPI	R16,2
+    006BC E0E0      LDI	R30,0
+    006BD 071E      CPC	R17,R30
+    006BE F061      BEQ	0x06CB
+    006BF 3003      CPI	R16,3
+    006C0 E0E0      LDI	R30,0
+    006C1 071E      CPC	R17,R30
+    006C2 F079      BEQ	0x06D2
+    006C3 C014      RJMP	0x06D8
+(0403)     {
+(0404)     case 1:
+(0405) 		    i2=50;
+    006C4 E382      LDI	R24,0x32
+    006C5 9380 01AA STS	i2,R24
+(0406)  			i1=0;	
+    006C7 2422      CLR	R2
+    006C8 9220 01AB STS	i1,R2
+(0407) 	break;
+    006CA C00D      RJMP	0x06D8
+(0408)     case 2:
+(0409) 		    i2=5;
+    006CB E085      LDI	R24,5
+    006CC 9380 01AA STS	i2,R24
+(0410)  			i1=0;
+    006CE 2422      CLR	R2
+    006CF 9220 01AB STS	i1,R2
+(0411) 	break;
+    006D1 C006      RJMP	0x06D8
+(0412)     case 3:
+(0413) 		   i2=1;
+    006D2 E081      LDI	R24,1
+    006D3 9380 01AA STS	i2,R24
+(0414)  		   i1=0;
+    006D5 2422      CLR	R2
+    006D6 9220 01AB STS	i1,R2
+(0415) 	break;
+(0416)     }
+(0417)   }
+(0418)  if(start_ts==1)
+    006D8 9180 0061 LDS	R24,start_ts
+    006DA 3081      CPI	R24,1
+    006DB F009      BEQ	0x06DD
+    006DC C049      RJMP	0x0726
+(0419)    {
+    006DD C043      RJMP	0x0721
+(0420)    while(start_ts==1)
+(0421)     {
+(0422)    switch(delay)
+    006DE 9100 0063 LDS	R16,delay
+    006E0 2711      CLR	R17
+    006E1 3000      CPI	R16,0
+    006E2 0701      CPC	R16,R17
+    006E3 F409      BNE	0x06E5
+    006E4 C03C      RJMP	0x0721
+    006E5 3001      CPI	R16,1
+    006E6 E0E0      LDI	R30,0
+    006E7 071E      CPC	R17,R30
+    006E8 F009      BEQ	0x06EA
+    006E9 C037      RJMP	0x0721
+(0423)      {
+(0424) 	case 0: ; break;
+(0425) 	case 1:
+(0426) 	         PORTC=data;
+    006EA 9020 0060 LDS	R2,data
+    006EC BA25      OUT	0x15,R2
+(0427) 			 for(i=1;i<=100;i++) {;}
+    006ED E081      LDI	R24,1
+    006EE 9380 01AC STS	i,R24
+    006F0 C005      RJMP	0x06F6
+    006F1 9180 01AC LDS	R24,i
+    006F3 5F8F      SUBI	R24,0xFF
+    006F4 9380 01AC STS	i,R24
+    006F6 E684      LDI	R24,0x64
+    006F7 9020 01AC LDS	R2,i
+    006F9 1582      CP	R24,R2
+    006FA F7B0      BCC	0x06F1
+(0428) 			 PORTC|=0x40;//set E
+    006FB 9AAE      SBI	0x15,6
+(0429) 			 for(i=1;i<=100;i++) {;}
+    006FC E081      LDI	R24,1
+    006FD 9380 01AC STS	i,R24
+    006FF C005      RJMP	0x0705
+    00700 9180 01AC LDS	R24,i
+    00702 5F8F      SUBI	R24,0xFF
+    00703 9380 01AC STS	i,R24
+    00705 E684      LDI	R24,0x64
+    00706 9020 01AC LDS	R2,i
+    00708 1582      CP	R24,R2
+    00709 F7B0      BCC	0x0700
+(0430) 			 PORTC&=0xBF;//clear E
+    0070A B385      IN	R24,0x15
+    0070B 7B8F      ANDI	R24,0xBF
+    0070C BB85      OUT	0x15,R24
+(0431) 			 for(i=1;i<=100;i++) {;}
+    0070D E081      LDI	R24,1
+    0070E 9380 01AC STS	i,R24
+    00710 C005      RJMP	0x0716
+    00711 9180 01AC LDS	R24,i
+    00713 5F8F      SUBI	R24,0xFF
+    00714 9380 01AC STS	i,R24
+    00716 E684      LDI	R24,0x64
+    00717 9020 01AC LDS	R2,i
+    00719 1582      CP	R24,R2
+    0071A F7B0      BCC	0x0711
+(0432) 			 PORTC=0x00;
+    0071B 2422      CLR	R2
+    0071C BA25      OUT	0x15,R2
+(0433) 			 start_ts=0;
+    0071D 9220 0061 STS	start_ts,R2
+(0434) 			 delay=0;
+    0071F 9220 0063 STS	delay,R2
+    00721 9180 0061 LDS	R24,start_ts
+    00723 3081      CPI	R24,1
+    00724 F409      BNE	0x0726
+    00725 CFB8      RJMP	0x06DE
+(0435) 	break;
+(0436) 	 }
+(0437) 	}
+(0438)    }	
+    00726 9508      RET
+_digit:
+    00727 934A      ST	-Y,R20
+    00728 935A      ST	-Y,R21
+(0439)  }
+(0440) 
+(0441) void digit(void)
+(0442)   {
+(0443)   switch(symbol)
+    00729 9140 0064 LDS	R20,symbol
+    0072B 2755      CLR	R21
+    0072C 3040      CPI	R20,0
+    0072D 0745      CPC	R20,R21
+    0072E F409      BNE	0x0730
+    0072F C02E      RJMP	0x075E
+    00730 3041      CPI	R20,1
+    00731 E0E0      LDI	R30,0
+    00732 075E      CPC	R21,R30
+    00733 F409      BNE	0x0735
+    00734 C032      RJMP	0x0767
+    00735 3042      CPI	R20,2
+    00736 E0E0      LDI	R30,0
+    00737 075E      CPC	R21,R30
+    00738 F409      BNE	0x073A
+    00739 C036      RJMP	0x0770
+    0073A 3043      CPI	R20,3
+    0073B E0E0      LDI	R30,0
+    0073C 075E      CPC	R21,R30
+    0073D F409      BNE	0x073F
+    0073E C03A      RJMP	0x0779
+    0073F 3044      CPI	R20,4
+    00740 E0E0      LDI	R30,0
+    00741 075E      CPC	R21,R30
+    00742 F409      BNE	0x0744
+    00743 C03E      RJMP	0x0782
+    00744 3045      CPI	R20,5
+    00745 E0E0      LDI	R30,0
+    00746 075E      CPC	R21,R30
+    00747 F409      BNE	0x0749
+    00748 C042      RJMP	0x078B
+    00749 3046      CPI	R20,6
+    0074A E0E0      LDI	R30,0
+    0074B 075E      CPC	R21,R30
+    0074C F409      BNE	0x074E
+    0074D C046      RJMP	0x0794
+    0074E 3047      CPI	R20,7
+    0074F E0E0      LDI	R30,0
+    00750 075E      CPC	R21,R30
+    00751 F409      BNE	0x0753
+    00752 C04A      RJMP	0x079D
+    00753 3048      CPI	R20,0x8
+    00754 E0E0      LDI	R30,0
+    00755 075E      CPC	R21,R30
+    00756 F409      BNE	0x0758
+    00757 C04E      RJMP	0x07A6
+    00758 3049      CPI	R20,0x9
+    00759 E0E0      LDI	R30,0
+    0075A 075E      CPC	R21,R30
+    0075B F409      BNE	0x075D
+    0075C C052      RJMP	0x07AF
+    0075D C059      RJMP	0x07B7
+(0444) 		 {
+(0445) 		 case 0:
+(0446) 		            data=0x23;
+    0075E E283      LDI	R24,0x23
+    0075F 9380 0060 STS	data,R24
+(0447) 					data_ts();
+    00761 DF4B      RCALL	_data_ts
+(0448) 					data=0x20;
+    00762 E280      LDI	R24,0x20
+    00763 9380 0060 STS	data,R24
+(0449) 					data_ts();
+    00765 DF47      RCALL	_data_ts
+(0450) 		 break;
+    00766 C050      RJMP	0x07B7
+(0451) 		 case 1:
+(0452) 		 	  		data=0x23;
+    00767 E283      LDI	R24,0x23
+    00768 9380 0060 STS	data,R24
+(0453) 					data_ts();
+    0076A DF42      RCALL	_data_ts
+(0454) 					data=0x21;
+    0076B E281      LDI	R24,0x21
+    0076C 9380 0060 STS	data,R24
+(0455) 					data_ts();
+    0076E DF3E      RCALL	_data_ts
+(0456) 		 break;
+    0076F C047      RJMP	0x07B7
+(0457) 		 case 2:
+(0458) 		 	  		data=0x23;
+    00770 E283      LDI	R24,0x23
+    00771 9380 0060 STS	data,R24
+(0459) 					data_ts();
+    00773 DF39      RCALL	_data_ts
+(0460) 					data=0x22;
+    00774 E282      LDI	R24,0x22
+    00775 9380 0060 STS	data,R24
+(0461) 					data_ts();
+    00777 DF35      RCALL	_data_ts
+(0462) 		 break;
+    00778 C03E      RJMP	0x07B7
+(0463) 		 case 3:
+(0464) 		 	  		data=0x23;
+    00779 E283      LDI	R24,0x23
+    0077A 9380 0060 STS	data,R24
+(0465) 					data_ts();
+    0077C DF30      RCALL	_data_ts
+(0466) 					data=0x23;
+    0077D E283      LDI	R24,0x23
+    0077E 9380 0060 STS	data,R24
+(0467) 					data_ts();
+    00780 DF2C      RCALL	_data_ts
+(0468) 		 break;
+    00781 C035      RJMP	0x07B7
+(0469) 		 case 4:
+(0470) 		 	  		data=0x23;
+    00782 E283      LDI	R24,0x23
+    00783 9380 0060 STS	data,R24
+(0471) 					data_ts();
+    00785 DF27      RCALL	_data_ts
+(0472) 					data=0x24;
+    00786 E284      LDI	R24,0x24
+    00787 9380 0060 STS	data,R24
+(0473) 					data_ts();
+    00789 DF23      RCALL	_data_ts
+(0474) 		 break;
+    0078A C02C      RJMP	0x07B7
+(0475) 		 case 5:
+(0476) 		 	  		data=0x23;
+    0078B E283      LDI	R24,0x23
+    0078C 9380 0060 STS	data,R24
+(0477) 					data_ts();
+    0078E DF1E      RCALL	_data_ts
+(0478) 					data=0x25;
+    0078F E285      LDI	R24,0x25
+    00790 9380 0060 STS	data,R24
+(0479) 					data_ts();
+    00792 DF1A      RCALL	_data_ts
+(0480) 		 break;
+    00793 C023      RJMP	0x07B7
+(0481) 		 case 6:
+(0482) 		 	  		data=0x23;
+    00794 E283      LDI	R24,0x23
+    00795 9380 0060 STS	data,R24
+(0483) 					data_ts();
+    00797 DF15      RCALL	_data_ts
+(0484) 					data=0x26;
+    00798 E286      LDI	R24,0x26
+    00799 9380 0060 STS	data,R24
+(0485) 					data_ts();
+    0079B DF11      RCALL	_data_ts
+(0486) 		 break;
+    0079C C01A      RJMP	0x07B7
+(0487) 		 case 7:
+(0488) 		 	  		data=0x23;
+    0079D E283      LDI	R24,0x23
+    0079E 9380 0060 STS	data,R24
+(0489) 					data_ts();
+    007A0 DF0C      RCALL	_data_ts
+(0490) 					data=0x27;
+    007A1 E287      LDI	R24,0x27
+    007A2 9380 0060 STS	data,R24
+(0491) 					data_ts();
+    007A4 DF08      RCALL	_data_ts
+(0492) 		 break;
+    007A5 C011      RJMP	0x07B7
+(0493) 		 case 8:
+(0494) 		 	  		data=0x23;
+    007A6 E283      LDI	R24,0x23
+    007A7 9380 0060 STS	data,R24
+(0495) 					data_ts();
+    007A9 DF03      RCALL	_data_ts
+(0496) 					data=0x28;
+    007AA E288      LDI	R24,0x28
+    007AB 9380 0060 STS	data,R24
+(0497) 					data_ts();
+    007AD DEFF      RCALL	_data_ts
+(0498) 		 break;
+    007AE C008      RJMP	0x07B7
+(0499) 		 case 9:
+(0500) 		 	  		data=0x23;
+    007AF E283      LDI	R24,0x23
+    007B0 9380 0060 STS	data,R24
+(0501) 					data_ts();
+    007B2 DEFA      RCALL	_data_ts
+(0502) 					data=0x29;
+    007B3 E289      LDI	R24,0x29
+    007B4 9380 0060 STS	data,R24
+(0503) 					data_ts();
+    007B6 DEF6      RCALL	_data_ts
+(0504) 		 break;
+    007B7 9159      LD	R21,Y+
+    007B8 9149      LD	R20,Y+
+    007B9 9508      RET
+(0505) 		 }
+(0506)   } 
+(0507)  
+(0508) void init_devices(void)
+(0509) {
+(0510)  CLI(); 
+_init_devices:
+    007BA 94F8      BCLR	7
+(0511)  port_init();
+    007BB D942      RCALL	_port_init
+(0512)  timer0_init();
+    007BC D94C      RCALL	_timer0_init
+(0513)  uart0_init();
+    007BD D953      RCALL	_uart0_init
+(0514)  MCUCR = 0x00;
+    007BE 2422      CLR	R2
+    007BF BE25      OUT	0x35,R2
+(0515)  GICR  = 0x00;//no external interrupts
+    007C0 BE2B      OUT	0x3B,R2
+(0516)  TIMSK = 0x02;//T0IC interrupt enable 
+    007C1 E082      LDI	R24,2
+    007C2 BF89      OUT	0x39,R24
+(0517)  SEI(); 
+    007C3 9478      BSET	7
+    007C4 9508      RET
+(0518) }
+(0519) 
+(0520) void main(void)
+(0521) {
+(0522)  init_devices();
+_main:
+    007C5 DFF4      RCALL	_init_devices
+    007C6 C03F      RJMP	0x0806
+(0523)  while(1)
+(0524)   {
+(0525)   //------------indicator----------------------------
+(0526)   //------------initialisation------------------------
+(0527)   if(stop_init==0)
+    007C7 9020 0065 LDS	R2,stop_init
+    007C9 2022      TST	R2
+    007CA F559      BNE	0x07F6
+(0528)    {
+(0529)       data=0x02;
+    007CB E082      LDI	R24,2
+    007CC 9380 0060 STS	data,R24
+(0530) 	  gain=1;//50ms
+    007CE E081      LDI	R24,1
+    007CF 9380 0062 STS	gain,R24
+(0531) 	  data_ts();
+    007D1 DEDB      RCALL	_data_ts
+(0532) 	  data=0x02;
+    007D2 E082      LDI	R24,2
+    007D3 9380 0060 STS	data,R24
+(0533) 	  gain=3;//1ms
+    007D5 E083      LDI	R24,3
+    007D6 9380 0062 STS	gain,R24
+(0534) 	  data_ts();
+    007D8 DED4      RCALL	_data_ts
+(0535) 	  data=0x08;
+    007D9 E088      LDI	R24,0x8
+    007DA 9380 0060 STS	data,R24
+(0536)       data_ts();
+    007DC DED0      RCALL	_data_ts
+(0537) 	  data=0x00;
+    007DD 2422      CLR	R2
+    007DE 9220 0060 STS	data,R2
+(0538) 	  data_ts();
+    007E0 DECC      RCALL	_data_ts
+(0539) 	  data=0x0C;
+    007E1 E08C      LDI	R24,0xC
+    007E2 9380 0060 STS	data,R24
+(0540) 	  data_ts();
+    007E4 DEC8      RCALL	_data_ts
+(0541) 	  data=0x00;
+    007E5 2422      CLR	R2
+    007E6 9220 0060 STS	data,R2
+(0542) 	  gain=2;//5ms
+    007E8 E082      LDI	R24,2
+    007E9 9380 0062 STS	gain,R24
+(0543) 	  data_ts();
+    007EB DEC1      RCALL	_data_ts
+(0544) 	  data=0x06;
+    007EC E086      LDI	R24,6
+    007ED 9380 0060 STS	data,R24
+(0545) 	  gain=3;//1ms
+    007EF E083      LDI	R24,3
+    007F0 9380 0062 STS	gain,R24
+(0546) 	  data_ts();
+    007F2 DEBA      RCALL	_data_ts
+(0547) 	  stop_init=1;
+    007F3 E081      LDI	R24,1
+    007F4 9380 0065 STS	stop_init,R24
+(0548)    }
+(0549)   //-------data transfering------
+(0550)   if(global==1)
+    007F6 9180 0082 LDS	R24,global
+    007F8 9190 0083 LDS	R25,global+1
+    007FA 3081      CPI	R24,1
+    007FB E0E0      LDI	R30,0
+    007FC 079E      CPC	R25,R30
+    007FD F411      BNE	0x0800
+(0551)   {
+(0552)   flag_2();
+    007FE D009      RCALL	_flag_2
+(0553)   }
+    007FF C001      RJMP	0x0801
+(0554)    else
+(0555)    {
+(0556)   flag_1();
+    00800 D258      RCALL	_flag_1
+(0557)    }
+(0558)   if(answer!=0)
+    00801 9020 01A0 LDS	R2,answer
+    00803 2022      TST	R2
+    00804 F009      BEQ	0x0806
+(0559)    {
+(0560)    transmit_data();
+    00805 DE9C      RCALL	_transmit_data
+    00806 CFC0      RJMP	0x07C7
+    00807 9508      RET
+_flag_2:
+    00808 940E 0E92 CALL	push_xgset300C
+(0561)    }
+(0562)   }
+(0563) }
+(0564) 
+(0565) void flag_2(void)// working condition!!!
+(0566) {
+(0567) switch(flag)
+    0080A 9140 0066 LDS	R20,flag
+    0080C 2755      CLR	R21
+    0080D 3040      CPI	R20,0
+    0080E 0745      CPC	R20,R21
+    0080F F121      BEQ	0x0834
+    00810 3041      CPI	R20,1
+    00811 E0E0      LDI	R30,0
+    00812 075E      CPC	R21,R30
+    00813 F409      BNE	0x0815
+    00814 C03E      RJMP	0x0853
+    00815 3042      CPI	R20,2
+    00816 E0E0      LDI	R30,0
+    00817 075E      CPC	R21,R30
+    00818 F409      BNE	0x081A
+    00819 C048      RJMP	0x0862
+    0081A 3043      CPI	R20,3
+    0081B E0E0      LDI	R30,0
+    0081C 075E      CPC	R21,R30
+    0081D F409      BNE	0x081F
+    0081E C06A      RJMP	0x0889
+    0081F 3044      CPI	R20,4
+    00820 E0E0      LDI	R30,0
+    00821 075E      CPC	R21,R30
+    00822 F409      BNE	0x0824
+    00823 C0A2      RJMP	0x08C6
+    00824 3045      CPI	R20,5
+    00825 E0E0      LDI	R30,0
+    00826 075E      CPC	R21,R30
+    00827 F409      BNE	0x0829
+    00828 C0F7      RJMP	0x0920
+    00829 3046      CPI	R20,6
+    0082A E0E0      LDI	R30,0
+    0082B 075E      CPC	R21,R30
+    0082C F409      BNE	0x082E
+    0082D C144      RJMP	0x0972
+    0082E 304A      CPI	R20,0xA
+    0082F E0E0      LDI	R30,0
+    00830 075E      CPC	R21,R30
+    00831 F409      BNE	0x0833
+    00832 C224      RJMP	0x0A57
+    00833 C223      RJMP	0x0A57
+(0568)    {
+(0569)    case 0://start window (1 second)
+(0570)    		  for(cnt=0;cnt<60;cnt++)
+    00834 2422      CLR	R2
+    00835 9220 0069 STS	cnt,R2
+    00837 C010      RJMP	0x0848
+(0571) 	 	   {
+(0572) 	 	   data=mass[cnt];
+    00838 EA83      LDI	R24,0xA3
+    00839 E090      LDI	R25,0
+    0083A 91E0 0069 LDS	R30,cnt
+    0083C 27FF      CLR	R31
+    0083D 0FE8      ADD	R30,R24
+    0083E 1FF9      ADC	R31,R25
+    0083F 8020      LD	R2,Z
+    00840 9220 0060 STS	data,R2
+(0573) 	 	   data_ts();
+    00842 DE6A      RCALL	_data_ts
+    00843 9180 0069 LDS	R24,cnt
+    00845 5F8F      SUBI	R24,0xFF
+    00846 9380 0069 STS	cnt,R24
+    00848 9180 0069 LDS	R24,cnt
+    0084A 338C      CPI	R24,0x3C
+    0084B F360      BCS	0x0838
+(0574) 	 	   }
+(0575) 		   flag1=1;
+    0084C E081      LDI	R24,1
+    0084D 9380 0067 STS	flag1,R24
+(0576) 		   flag=10;
+    0084F E08A      LDI	R24,0xA
+    00850 9380 0066 STS	flag,R24
+(0577)    break;
+    00852 C204      RJMP	0x0A57
+(0578)    case 1://clear screen
+(0579)    		  gain=1;//delay 50ms
+    00853 E081      LDI	R24,1
+    00854 9380 0062 STS	gain,R24
+(0580) 	  	  data=0x00;
+    00856 2422      CLR	R2
+    00857 9220 0060 STS	data,R2
+(0581) 	  	  data_ts();
+    00859 DE53      RCALL	_data_ts
+(0582) 	  	  data=0x01;
+    0085A E081      LDI	R24,1
+    0085B 9380 0060 STS	data,R24
+(0583) 	  	  data_ts();
+    0085D DE4F      RCALL	_data_ts
+(0584) 	  	  flag=2;
+    0085E E082      LDI	R24,2
+    0085F 9380 0066 STS	flag,R24
+(0585)    break;
+    00861 C1F5      RJMP	0x0A57
+(0586)    case 2://switch display on, work window
+(0587)    		  data=0x00;
+    00862 2422      CLR	R2
+    00863 9220 0060 STS	data,R2
+(0588) 		  data_ts();
+    00865 DE47      RCALL	_data_ts
+(0589) 		  data=0x0C;
+    00866 E08C      LDI	R24,0xC
+    00867 9380 0060 STS	data,R24
+(0590) 		  data_ts();
+    00869 DE43      RCALL	_data_ts
+(0591) 		  gain=3;//delay 
+    0086A E083      LDI	R24,3
+    0086B 9380 0062 STS	gain,R24
+(0592) 	 	  for(cnt=0;cnt<62;cnt++)
+    0086D 2422      CLR	R2
+    0086E 9220 0069 STS	cnt,R2
+    00870 C010      RJMP	0x0881
+(0593) 	       {
+(0594) 	       data=mass1[cnt];
+    00871 ED8F      LDI	R24,0xDF
+    00872 E090      LDI	R25,0
+    00873 91E0 0069 LDS	R30,cnt
+    00875 27FF      CLR	R31
+    00876 0FE8      ADD	R30,R24
+    00877 1FF9      ADC	R31,R25
+    00878 8020      LD	R2,Z
+    00879 9220 0060 STS	data,R2
+(0595) 	       data_ts();
+    0087B DE31      RCALL	_data_ts
+    0087C 9180 0069 LDS	R24,cnt
+    0087E 5F8F      SUBI	R24,0xFF
+    0087F 9380 0069 STS	cnt,R24
+    00881 9180 0069 LDS	R24,cnt
+    00883 338E      CPI	R24,0x3E
+    00884 F360      BCS	0x0871
+(0596) 	       }
+(0597) 		   flag=3;
+    00885 E083      LDI	R24,3
+    00886 9380 0066 STS	flag,R24
+(0598)    break;
+    00888 C1CE      RJMP	0x0A57
+(0599)    case 3://alfa, deg
+(0600)    		  ddd=alfa_i/100;
+    00889 E624      LDI	R18,0x64
+    0088A E030      LDI	R19,0
+    0088B 9100 0072 LDS	R16,alfa_i
+    0088D 9110 0073 LDS	R17,alfa_i+1
+    0088F 940E 0DFE CALL	div16u
+    00891 9300 0070 STS	ddd,R16
+(0601) 		  dd=(alfa_i/10)%10;
+    00893 E02A      LDI	R18,0xA
+    00894 E030      LDI	R19,0
+    00895 9100 0072 LDS	R16,alfa_i
+    00897 9110 0073 LDS	R17,alfa_i+1
+    00899 940E 0DFE CALL	div16u
+    0089B E02A      LDI	R18,0xA
+    0089C E030      LDI	R19,0
+    0089D 940E 0DFC CALL	mod16u
+    0089F 9300 006F STS	dd,R16
+(0602) 		  d=alfa_i%10;
+    008A1 E02A      LDI	R18,0xA
+    008A2 E030      LDI	R19,0
+    008A3 9100 0072 LDS	R16,alfa_i
+    008A5 9110 0073 LDS	R17,alfa_i+1
+    008A7 940E 0DFC CALL	mod16u
+    008A9 9300 006E STS	d,R16
+(0603) 		  data=0x09;
+    008AB E089      LDI	R24,0x9
+    008AC 9380 0060 STS	data,R24
+(0604) 		  data_ts();
+    008AE DDFE      RCALL	_data_ts
+(0605) 		  data=0x05;
+    008AF E085      LDI	R24,5
+    008B0 9380 0060 STS	data,R24
+(0606) 		  data_ts();
+    008B2 DDFA      RCALL	_data_ts
+(0607) 		  symbol=ddd;
+    008B3 9020 0070 LDS	R2,ddd
+    008B5 9220 0064 STS	symbol,R2
+(0608) 		  digit();
+    008B7 DE6F      RCALL	_digit
+(0609) 		  symbol=dd;
+    008B8 9020 006F LDS	R2,dd
+    008BA 9220 0064 STS	symbol,R2
+(0610) 		  digit();
+    008BC DE6A      RCALL	_digit
+(0611) 		  symbol=d;
+    008BD 9020 006E LDS	R2,d
+    008BF 9220 0064 STS	symbol,R2
+(0612) 		  digit();
+    008C1 DE65      RCALL	_digit
+(0613) 		  flag=4;
+    008C2 E084      LDI	R24,4
+    008C3 9380 0066 STS	flag,R24
+(0614) 		  
+(0615)    break;
+    008C5 C191      RJMP	0x0A57
+(0616)    case 4://armature current
+(0617)    		  ddd=tok_i/100;
+    008C6 E624      LDI	R18,0x64
+    008C7 E030      LDI	R19,0
+    008C8 9100 0076 LDS	R16,tok_i
+    008CA 9110 0077 LDS	R17,tok_i+1
+    008CC 940E 0DFE CALL	div16u
+    008CE 9300 0070 STS	ddd,R16
+(0618) 		  dd=(tok_i/10)%10;
+    008D0 E02A      LDI	R18,0xA
+    008D1 E030      LDI	R19,0
+    008D2 9100 0076 LDS	R16,tok_i
+    008D4 9110 0077 LDS	R17,tok_i+1
+    008D6 940E 0DFE CALL	div16u
+    008D8 E02A      LDI	R18,0xA
+    008D9 E030      LDI	R19,0
+    008DA 940E 0DFC CALL	mod16u
+    008DC 9300 006F STS	dd,R16
+(0619) 		  d=tok_i%10;
+    008DE E02A      LDI	R18,0xA
+    008DF E030      LDI	R19,0
+    008E0 9100 0076 LDS	R16,tok_i
+    008E2 9110 0077 LDS	R17,tok_i+1
+    008E4 940E 0DFC CALL	mod16u
+    008E6 9300 006E STS	d,R16
+(0620) 		  data=0x0C;
+    008E8 E08C      LDI	R24,0xC
+    008E9 9380 0060 STS	data,R24
+(0621) 		  data_ts();
+    008EB DDC1      RCALL	_data_ts
+(0622) 		  data=0x03;
+    008EC E083      LDI	R24,3
+    008ED 9380 0060 STS	data,R24
+(0623) 		  data_ts();
+    008EF DDBD      RCALL	_data_ts
+(0624) 		  if(sign_current==1)
+    008F0 9180 01A9 LDS	R24,sign_current
+    008F2 3081      CPI	R24,1
+    008F3 F449      BNE	0x08FD
+(0625) 		   {
+(0626) 		   data=0x28;
+    008F4 E288      LDI	R24,0x28
+    008F5 9380 0060 STS	data,R24
+(0627) 		   data_ts();
+    008F7 DDB5      RCALL	_data_ts
+(0628) 		   data=0x20;
+    008F8 E280      LDI	R24,0x20
+    008F9 9380 0060 STS	data,R24
+(0629) 		   data_ts();
+    008FB DDB1      RCALL	_data_ts
+(0630) 		   }
+    008FC C008      RJMP	0x0905
+(0631) 		  else
+(0632) 		   {
+(0633) 		   data=0x22;
+    008FD E282      LDI	R24,0x22
+    008FE 9380 0060 STS	data,R24
+(0634) 		   data_ts();
+    00900 DDAC      RCALL	_data_ts
+(0635) 		   data=0x2D;
+    00901 E28D      LDI	R24,0x2D
+    00902 9380 0060 STS	data,R24
+(0636) 		   data_ts();//-
+    00904 DDA8      RCALL	_data_ts
+(0637) 		   }
+(0638) 		  symbol=ddd;
+    00905 9020 0070 LDS	R2,ddd
+    00907 9220 0064 STS	symbol,R2
+(0639) 		  digit();
+    00909 DE1D      RCALL	_digit
+(0640) 		  data=0x22;
+    0090A E282      LDI	R24,0x22
+    0090B 9380 0060 STS	data,R24
+(0641) 		  data_ts();
+    0090D DD9F      RCALL	_data_ts
+(0642) 		  data=0x2C;
+    0090E E28C      LDI	R24,0x2C
+    0090F 9380 0060 STS	data,R24
+(0643) 		  data_ts();//,
+    00911 DD9B      RCALL	_data_ts
+(0644) 		  symbol=dd;
+    00912 9020 006F LDS	R2,dd
+    00914 9220 0064 STS	symbol,R2
+(0645) 		  digit();
+    00916 DE10      RCALL	_digit
+(0646) 		  symbol=d;
+    00917 9020 006E LDS	R2,d
+    00919 9220 0064 STS	symbol,R2
+(0647) 		  digit();
+    0091B DE0B      RCALL	_digit
+(0648) 		  flag=5;
+    0091C E085      LDI	R24,5
+    0091D 9380 0066 STS	flag,R24
+(0649)    break;
+    0091F C137      RJMP	0x0A57
+(0650)    case 5://armature voltage
+(0651)    		  ddd=volt_i/100;
+    00920 E624      LDI	R18,0x64
+    00921 E030      LDI	R19,0
+    00922 9100 0078 LDS	R16,volt_i
+    00924 9110 0079 LDS	R17,volt_i+1
+    00926 940E 0DFE CALL	div16u
+    00928 9300 0070 STS	ddd,R16
+(0652) 		  dd=(volt_i/10)%10;
+    0092A E02A      LDI	R18,0xA
+    0092B E030      LDI	R19,0
+    0092C 9100 0078 LDS	R16,volt_i
+    0092E 9110 0079 LDS	R17,volt_i+1
+    00930 940E 0DFE CALL	div16u
+    00932 E02A      LDI	R18,0xA
+    00933 E030      LDI	R19,0
+    00934 940E 0DFC CALL	mod16u
+    00936 9300 006F STS	dd,R16
+(0653) 		  d=volt_i%10;
+    00938 E02A      LDI	R18,0xA
+    00939 E030      LDI	R19,0
+    0093A 9100 0078 LDS	R16,volt_i
+    0093C 9110 0079 LDS	R17,volt_i+1
+    0093E 940E 0DFC CALL	mod16u
+    00940 9300 006E STS	d,R16
+(0654) 		  data=0x08;
+    00942 E088      LDI	R24,0x8
+    00943 9380 0060 STS	data,R24
+(0655) 		  data_ts();
+    00945 DD67      RCALL	_data_ts
+(0656) 		  data=0x03;
+    00946 E083      LDI	R24,3
+    00947 9380 0060 STS	data,R24
+(0657) 		  data_ts();
+    00949 DD63      RCALL	_data_ts
+(0658) 		  if(sign_voltage==1)
+    0094A 9180 01A8 LDS	R24,sign_voltage
+    0094C 3081      CPI	R24,1
+    0094D F449      BNE	0x0957
+(0659) 		   {
+(0660) 		   data=0x28;
+    0094E E288      LDI	R24,0x28
+    0094F 9380 0060 STS	data,R24
+(0661) 		   data_ts();
+    00951 DD5B      RCALL	_data_ts
+(0662) 		   data=0x20;
+    00952 E280      LDI	R24,0x20
+    00953 9380 0060 STS	data,R24
+(0663) 		   data_ts();
+    00955 DD57      RCALL	_data_ts
+(0664) 		   }
+    00956 C008      RJMP	0x095F
+(0665) 		  else
+(0666) 		   {
+(0667) 		   data=0x22;
+    00957 E282      LDI	R24,0x22
+    00958 9380 0060 STS	data,R24
+(0668) 		   data_ts();
+    0095A DD52      RCALL	_data_ts
+(0669) 		   data=0x2D;
+    0095B E28D      LDI	R24,0x2D
+    0095C 9380 0060 STS	data,R24
+(0670) 		   data_ts();//-
+    0095E DD4E      RCALL	_data_ts
+(0671) 		   }
+(0672) 		  symbol=ddd;
+    0095F 9020 0070 LDS	R2,ddd
+    00961 9220 0064 STS	symbol,R2
+(0673) 		  digit();
+    00963 DDC3      RCALL	_digit
+(0674) 		  symbol=dd;
+    00964 9020 006F LDS	R2,dd
+    00966 9220 0064 STS	symbol,R2
+(0675) 		  digit();
+    00968 DDBE      RCALL	_digit
+(0676) 		  symbol=d;
+    00969 9020 006E LDS	R2,d
+    0096B 9220 0064 STS	symbol,R2
+(0677) 		  digit();
+    0096D DDB9      RCALL	_digit
+(0678) 		  flag=6;
+    0096E E086      LDI	R24,6
+    0096F 9380 0066 STS	flag,R24
+(0679)    break;
+    00971 C0E5      RJMP	0x0A57
+(0680)    case 6://output power
+(0681)    		  power=volt_i*tok_i;
+    00972 9120 0076 LDS	R18,tok_i
+    00974 9130 0077 LDS	R19,tok_i+1
+    00976 9100 0078 LDS	R16,volt_i
+    00978 9110 0079 LDS	R17,volt_i+1
+    0097A 940E 0E82 CALL	empy16s
+    0097C 0118      MOVW	R2,R16
+    0097D 2444      CLR	R4
+    0097E 2455      CLR	R5
+    0097F 9230 01A4 STS	power+1,R3
+    00981 9220 01A3 STS	power,R2
+    00983 9250 01A6 STS	power+3,R5
+    00985 9240 01A5 STS	power+2,R4
+(0682) 		  power=power/100;
+    00987 E684      LDI	R24,0x64
+    00988 E090      LDI	R25,0
+    00989 E0A0      LDI	R26,0
+    0098A E0B0      LDI	R27,0
+    0098B 0181      MOVW	R16,R2
+    0098C 0192      MOVW	R18,R4
+    0098D 93BA      ST	-Y,R27
+    0098E 93AA      ST	-Y,R26
+    0098F 939A      ST	-Y,R25
+    00990 938A      ST	-Y,R24
+    00991 940E 0E18 CALL	div32u
+    00993 9310 01A4 STS	power+1,R17
+    00995 9300 01A3 STS	power,R16
+    00997 9330 01A6 STS	power+3,R19
+    00999 9320 01A5 STS	power+2,R18
+(0683) 		  if(sign_voltage==1)
+    0099B 9180 01A8 LDS	R24,sign_voltage
+    0099D 3081      CPI	R24,1
+    0099E F461      BNE	0x09AB
+(0684) 		   {
+(0685) 		   if(sign_current==1) {sign_power=1;}
+    0099F 9180 01A9 LDS	R24,sign_current
+    009A1 3081      CPI	R24,1
+    009A2 F421      BNE	0x09A7
+    009A3 E081      LDI	R24,1
+    009A4 9380 01A7 STS	sign_power,R24
+    009A6 C00F      RJMP	0x09B6
+(0686) 		   else {sign_power=0;}
+    009A7 2422      CLR	R2
+    009A8 9220 01A7 STS	sign_power,R2
+(0687) 		   }
+    009AA C00B      RJMP	0x09B6
+(0688) 		  else
+(0689) 		   {
+(0690) 		   if(sign_current==0) {sign_power=1;}
+    009AB 9020 01A9 LDS	R2,sign_current
+    009AD 2022      TST	R2
+    009AE F421      BNE	0x09B3
+    009AF E081      LDI	R24,1
+    009B0 9380 01A7 STS	sign_power,R24
+    009B2 C003      RJMP	0x09B6
+(0691) 		   else {sign_power=0;}
+    009B3 2422      CLR	R2
+    009B4 9220 01A7 STS	sign_power,R2
+(0692) 		   }
+(0693) 		  dddd=power/1000;
+    009B6 EE88      LDI	R24,0xE8
+    009B7 E093      LDI	R25,3
+    009B8 E0A0      LDI	R26,0
+    009B9 E0B0      LDI	R27,0
+    009BA 9120 01A5 LDS	R18,power+2
+    009BC 9130 01A6 LDS	R19,power+3
+    009BE 9100 01A3 LDS	R16,power
+    009C0 9110 01A4 LDS	R17,power+1
+    009C2 93BA      ST	-Y,R27
+    009C3 93AA      ST	-Y,R26
+    009C4 939A      ST	-Y,R25
+    009C5 938A      ST	-Y,R24
+    009C6 940E 0E18 CALL	div32u
+    009C8 9300 0071 STS	dddd,R16
+(0694) 		  ddd=(power/100)%10;
+    009CA E684      LDI	R24,0x64
+    009CB E090      LDI	R25,0
+    009CC E0A0      LDI	R26,0
+    009CD E0B0      LDI	R27,0
+    009CE 9120 01A5 LDS	R18,power+2
+    009D0 9130 01A6 LDS	R19,power+3
+    009D2 9100 01A3 LDS	R16,power
+    009D4 9110 01A4 LDS	R17,power+1
+    009D6 93BA      ST	-Y,R27
+    009D7 93AA      ST	-Y,R26
+    009D8 939A      ST	-Y,R25
+    009D9 938A      ST	-Y,R24
+    009DA 940E 0E18 CALL	div32u
+    009DC E08A      LDI	R24,0xA
+    009DD E090      LDI	R25,0
+    009DE E0A0      LDI	R26,0
+    009DF E0B0      LDI	R27,0
+    009E0 93BA      ST	-Y,R27
+    009E1 93AA      ST	-Y,R26
+    009E2 939A      ST	-Y,R25
+    009E3 938A      ST	-Y,R24
+    009E4 940E 0E1A CALL	mod32u
+    009E6 9300 0070 STS	ddd,R16
+(0695) 		  dd=(power/10)%10;
+    009E8 E08A      LDI	R24,0xA
+    009E9 E090      LDI	R25,0
+    009EA E0A0      LDI	R26,0
+    009EB E0B0      LDI	R27,0
+    009EC 9120 01A5 LDS	R18,power+2
+    009EE 9130 01A6 LDS	R19,power+3
+    009F0 9100 01A3 LDS	R16,power
+    009F2 9110 01A4 LDS	R17,power+1
+    009F4 93BA      ST	-Y,R27
+    009F5 93AA      ST	-Y,R26
+    009F6 939A      ST	-Y,R25
+    009F7 938A      ST	-Y,R24
+    009F8 940E 0E18 CALL	div32u
+    009FA E08A      LDI	R24,0xA
+    009FB E090      LDI	R25,0
+    009FC E0A0      LDI	R26,0
+    009FD E0B0      LDI	R27,0
+    009FE 93BA      ST	-Y,R27
+    009FF 93AA      ST	-Y,R26
+    00A00 939A      ST	-Y,R25
+    00A01 938A      ST	-Y,R24
+    00A02 940E 0E1A CALL	mod32u
+    00A04 9300 006F STS	dd,R16
+(0696) 		  d=power%10;
+    00A06 E08A      LDI	R24,0xA
+    00A07 E090      LDI	R25,0
+    00A08 E0A0      LDI	R26,0
+    00A09 E0B0      LDI	R27,0
+    00A0A 9120 01A5 LDS	R18,power+2
+    00A0C 9130 01A6 LDS	R19,power+3
+    00A0E 9100 01A3 LDS	R16,power
+    00A10 9110 01A4 LDS	R17,power+1
+    00A12 93BA      ST	-Y,R27
+    00A13 93AA      ST	-Y,R26
+    00A14 939A      ST	-Y,R25
+    00A15 938A      ST	-Y,R24
+    00A16 940E 0E1A CALL	mod32u
+    00A18 9300 006E STS	d,R16
+(0697) 		  data=0x0D;
+    00A1A E08D      LDI	R24,0xD
+    00A1B 9380 0060 STS	data,R24
+(0698) 		  data_ts();
+    00A1D DC8F      RCALL	_data_ts
+(0699) 		  data=0x03;
+    00A1E E083      LDI	R24,3
+    00A1F 9380 0060 STS	data,R24
+(0700) 		  data_ts();
+    00A21 DC8B      RCALL	_data_ts
+(0701) 		  if(sign_power==1)
+    00A22 9180 01A7 LDS	R24,sign_power
+    00A24 3081      CPI	R24,1
+    00A25 F449      BNE	0x0A2F
+(0702) 		   {
+(0703) 		   data=0x28;
+    00A26 E288      LDI	R24,0x28
+    00A27 9380 0060 STS	data,R24
+(0704) 		   data_ts();
+    00A29 DC83      RCALL	_data_ts
+(0705) 		   data=0x20;
+    00A2A E280      LDI	R24,0x20
+    00A2B 9380 0060 STS	data,R24
+(0706) 		   data_ts();
+    00A2D DC7F      RCALL	_data_ts
+(0707) 		   }
+    00A2E C008      RJMP	0x0A37
+(0708) 		  else
+(0709) 		   {
+(0710) 		   data=0x22;
+    00A2F E282      LDI	R24,0x22
+    00A30 9380 0060 STS	data,R24
+(0711) 		   data_ts();
+    00A32 DC7A      RCALL	_data_ts
+(0712) 		   data=0x2D;
+    00A33 E28D      LDI	R24,0x2D
+    00A34 9380 0060 STS	data,R24
+(0713) 		   data_ts();//-
+    00A36 DC76      RCALL	_data_ts
+(0714) 		   }
+(0715) 		  symbol=dddd;
+    00A37 9020 0071 LDS	R2,dddd
+    00A39 9220 0064 STS	symbol,R2
+(0716) 		  digit();  
+    00A3B DCEB      RCALL	_digit
+(0717) 		  symbol=ddd;
+    00A3C 9020 0070 LDS	R2,ddd
+    00A3E 9220 0064 STS	symbol,R2
+(0718) 		  digit();
+    00A40 DCE6      RCALL	_digit
+(0719) 		  symbol=dd;
+    00A41 9020 006F LDS	R2,dd
+    00A43 9220 0064 STS	symbol,R2
+(0720) 		  digit();
+    00A45 DCE1      RCALL	_digit
+(0721) 		  symbol=d;
+    00A46 9020 006E LDS	R2,d
+    00A48 9220 0064 STS	symbol,R2
+(0722) 		  digit();
+    00A4A DCDC      RCALL	_digit
+(0723) 		  flag=10;//wait mode
+    00A4B E08A      LDI	R24,0xA
+    00A4C 9380 0066 STS	flag,R24
+(0724) 		  flag2=1;
+    00A4E E081      LDI	R24,1
+    00A4F 9380 0068 STS	flag2,R24
+(0725) 		  cnt2=0;
+    00A51 2422      CLR	R2
+    00A52 2433      CLR	R3
+    00A53 9230 006D STS	cnt2+1,R3
+    00A55 9220 006C STS	cnt2,R2
+(0726) 		  break;
+(0727)           case 10:
+(0728)    		   ;
+(0729)           break;
+    00A57 940C 0E97 JMP	pop_xgset300C
+_flag_1:
+    00A59 934A      ST	-Y,R20
+    00A5A 935A      ST	-Y,R21
+(0730)    }
+(0731)    }
+(0732) void flag_1(void)//program condition!!!
+(0733) {
+(0734) switch(flag)
+    00A5B 9140 0066 LDS	R20,flag
+    00A5D 2755      CLR	R21
+    00A5E 3040      CPI	R20,0
+    00A5F 0745      CPC	R20,R21
+    00A60 F0D1      BEQ	0x0A7B
+    00A61 3041      CPI	R20,1
+    00A62 E0E0      LDI	R30,0
+    00A63 075E      CPC	R21,R30
+    00A64 F409      BNE	0x0A66
+    00A65 C034      RJMP	0x0A9A
+    00A66 3042      CPI	R20,2
+    00A67 E0E0      LDI	R30,0
+    00A68 075E      CPC	R21,R30
+    00A69 F409      BNE	0x0A6B
+    00A6A C03E      RJMP	0x0AA9
+    00A6B 3043      CPI	R20,3
+    00A6C E0E0      LDI	R30,0
+    00A6D 075E      CPC	R21,R30
+    00A6E F409      BNE	0x0A70
+    00A6F C060      RJMP	0x0AD0
+    00A70 3040      CPI	R20,0
+    00A71 E0E0      LDI	R30,0
+    00A72 075E      CPC	R21,R30
+    00A73 F40C      BGE	0x0A75
+    00A74 C384      RJMP	0x0DF9
+    00A75 304A      CPI	R20,0xA
+    00A76 E0E0      LDI	R30,0
+    00A77 075E      CPC	R21,R30
+    00A78 F409      BNE	0x0A7A
+    00A79 C37F      RJMP	0x0DF9
+    00A7A C37E      RJMP	0x0DF9
+(0735)    {
+(0736)    case 0://start window (1 second)
+(0737)    		  for(cnt=0;cnt<60;cnt++)
+    00A7B 2422      CLR	R2
+    00A7C 9220 0069 STS	cnt,R2
+    00A7E C010      RJMP	0x0A8F
+(0738) 	 	   {
+(0739) 	 	   data=mass[cnt];
+    00A7F EA83      LDI	R24,0xA3
+    00A80 E090      LDI	R25,0
+    00A81 91E0 0069 LDS	R30,cnt
+    00A83 27FF      CLR	R31
+    00A84 0FE8      ADD	R30,R24
+    00A85 1FF9      ADC	R31,R25
+    00A86 8020      LD	R2,Z
+    00A87 9220 0060 STS	data,R2
+(0740) 	 	   data_ts();
+    00A89 DC23      RCALL	_data_ts
+    00A8A 9180 0069 LDS	R24,cnt
+    00A8C 5F8F      SUBI	R24,0xFF
+    00A8D 9380 0069 STS	cnt,R24
+    00A8F 9180 0069 LDS	R24,cnt
+    00A91 338C      CPI	R24,0x3C
+    00A92 F360      BCS	0x0A7F
+(0741) 	 	   }
+(0742) 		   flag1=1;
+    00A93 E081      LDI	R24,1
+    00A94 9380 0067 STS	flag1,R24
+(0743) 		   flag=10;
+    00A96 E08A      LDI	R24,0xA
+    00A97 9380 0066 STS	flag,R24
+(0744)    break;
+    00A99 C35F      RJMP	0x0DF9
+(0745)    case 1://clear screen
+(0746)    		  gain=1;//delay 50ms
+    00A9A E081      LDI	R24,1
+    00A9B 9380 0062 STS	gain,R24
+(0747) 	  	  data=0x00;
+    00A9D 2422      CLR	R2
+    00A9E 9220 0060 STS	data,R2
+(0748) 	  	  data_ts();
+    00AA0 DC0C      RCALL	_data_ts
+(0749) 	  	  data=0x01;
+    00AA1 E081      LDI	R24,1
+    00AA2 9380 0060 STS	data,R24
+(0750) 	  	  data_ts();
+    00AA4 DC08      RCALL	_data_ts
+(0751) 	  	  flag=2;
+    00AA5 E082      LDI	R24,2
+    00AA6 9380 0066 STS	flag,R24
+(0752)    break;
+    00AA8 C350      RJMP	0x0DF9
+(0753)    case 2: data=0x00;//switch display on, work window
+    00AA9 2422      CLR	R2
+    00AAA 9220 0060 STS	data,R2
+(0754) 		  data_ts();
+    00AAC DC00      RCALL	_data_ts
+(0755) 		  data=0x0C;
+    00AAD E08C      LDI	R24,0xC
+    00AAE 9380 0060 STS	data,R24
+(0756) 		  data_ts();
+    00AB0 DBFC      RCALL	_data_ts
+(0757) 		  gain=3;//delay 
+    00AB1 E083      LDI	R24,3
+    00AB2 9380 0062 STS	gain,R24
+(0758) 	 	  for(cnt=0;cnt<34;cnt++)
+    00AB4 2422      CLR	R2
+    00AB5 9220 0069 STS	cnt,R2
+    00AB7 C010      RJMP	0x0AC8
+(0759) 	      {
+(0760) 	      data=mass2[cnt];
+    00AB8 E18D      LDI	R24,0x1D
+    00AB9 E091      LDI	R25,1
+    00ABA 91E0 0069 LDS	R30,cnt
+    00ABC 27FF      CLR	R31
+    00ABD 0FE8      ADD	R30,R24
+    00ABE 1FF9      ADC	R31,R25
+    00ABF 8020      LD	R2,Z
+    00AC0 9220 0060 STS	data,R2
+(0761) 	      data_ts();
+    00AC2 DBEA      RCALL	_data_ts
+    00AC3 9180 0069 LDS	R24,cnt
+    00AC5 5F8F      SUBI	R24,0xFF
+    00AC6 9380 0069 STS	cnt,R24
+    00AC8 9180 0069 LDS	R24,cnt
+    00ACA 3282      CPI	R24,0x22
+    00ACB F360      BCS	0x0AB8
+(0762) 	      }
+(0763) 		  flag=3;
+    00ACC E083      LDI	R24,3
+    00ACD 9380 0066 STS	flag,R24
+(0764) 		  break;
+    00ACF C329      RJMP	0x0DF9
+(0765) 	case 3: switch(temp)
+    00AD0 9140 00A1 LDS	R20,temp
+    00AD2 2755      CLR	R21
+    00AD3 3340      CPI	R20,0x30
+    00AD4 E0E0      LDI	R30,0
+    00AD5 075E      CPC	R21,R30
+    00AD6 F409      BNE	0x0AD8
+    00AD7 C14E      RJMP	0x0C26
+    00AD8 E380      LDI	R24,0x30
+    00AD9 E090      LDI	R25,0
+    00ADA 1784      CP	R24,R20
+    00ADB 0795      CPC	R25,R21
+    00ADC F0A4      BLT	0x0AF1
+    00ADD 3140      CPI	R20,0x10
+    00ADE E0E0      LDI	R30,0
+    00ADF 075E      CPC	R21,R30
+    00AE0 F409      BNE	0x0AE2
+    00AE1 C088      RJMP	0x0B6A
+    00AE2 E180      LDI	R24,0x10
+    00AE3 E090      LDI	R25,0
+    00AE4 1784      CP	R24,R20
+    00AE5 0795      CPC	R25,R21
+    00AE6 F024      BLT	0x0AEB
+    00AE7 3040      CPI	R20,0
+    00AE8 0745      CPC	R20,R21
+    00AE9 F139      BEQ	0x0B11
+    00AEA C30E      RJMP	0x0DF9
+    00AEB 3240      CPI	R20,0x20
+    00AEC E0E0      LDI	R30,0
+    00AED 075E      CPC	R21,R30
+    00AEE F409      BNE	0x0AF0
+    00AEF C0D8      RJMP	0x0BC8
+    00AF0 C308      RJMP	0x0DF9
+    00AF1 3540      CPI	R20,0x50
+    00AF2 E0E0      LDI	R30,0
+    00AF3 075E      CPC	R21,R30
+    00AF4 F409      BNE	0x0AF6
+    00AF5 C1EC      RJMP	0x0CE2
+    00AF6 E580      LDI	R24,0x50
+    00AF7 E090      LDI	R25,0
+    00AF8 1784      CP	R24,R20
+    00AF9 0795      CPC	R25,R21
+    00AFA F034      BLT	0x0B01
+    00AFB 3440      CPI	R20,0x40
+    00AFC E0E0      LDI	R30,0
+    00AFD 075E      CPC	R21,R30
+    00AFE F409      BNE	0x0B00
+    00AFF C184      RJMP	0x0C84
+    00B00 C2F8      RJMP	0x0DF9
+    00B01 3640      CPI	R20,0x60
+    00B02 E0E0      LDI	R30,0
+    00B03 075E      CPC	R21,R30
+    00B04 F409      BNE	0x0B06
+    00B05 C23A      RJMP	0x0D40
+    00B06 3640      CPI	R20,0x60
+    00B07 E0E0      LDI	R30,0
+    00B08 075E      CPC	R21,R30
+    00B09 F40C      BGE	0x0B0B
+    00B0A C2EE      RJMP	0x0DF9
+    00B0B 3740      CPI	R20,0x70
+    00B0C E0E0      LDI	R30,0
+    00B0D 075E      CPC	R21,R30
+    00B0E F409      BNE	0x0B10
+    00B0F C289      RJMP	0x0D99
+    00B10 C2E8      RJMP	0x0DF9
+(0766) 			   {
+(0767) 			   case 0x00: 
+(0768) 			              for(cnt=0;cnt<14;cnt++)//kprop_i
+    00B11 2422      CLR	R2
+    00B12 9220 0069 STS	cnt,R2
+    00B14 C010      RJMP	0x0B25
+(0769) 	                      {
+(0770) 	                      data=mass3[cnt];
+    00B15 E38F      LDI	R24,0x3F
+    00B16 E091      LDI	R25,1
+    00B17 91E0 0069 LDS	R30,cnt
+    00B19 27FF      CLR	R31
+    00B1A 0FE8      ADD	R30,R24
+    00B1B 1FF9      ADC	R31,R25
+    00B1C 8020      LD	R2,Z
+    00B1D 9220 0060 STS	data,R2
+(0771) 	                      data_ts();
+    00B1F DB8D      RCALL	_data_ts
+    00B20 9180 0069 LDS	R24,cnt
+    00B22 5F8F      SUBI	R24,0xFF
+    00B23 9380 0069 STS	cnt,R24
+    00B25 9180 0069 LDS	R24,cnt
+    00B27 308E      CPI	R24,0xE
+    00B28 F360      BCS	0x0B15
+(0772) 	                      }
+(0773) 			              ddd=kprop_i/100;
+    00B29 E624      LDI	R18,0x64
+    00B2A E030      LDI	R19,0
+    00B2B 9100 0084 LDS	R16,kprop_i
+    00B2D 9110 0085 LDS	R17,kprop_i+1
+    00B2F 940E 0DFE CALL	div16u
+    00B31 9300 0070 STS	ddd,R16
+(0774) 			              dd=(kprop_i/10)%10;
+    00B33 E02A      LDI	R18,0xA
+    00B34 E030      LDI	R19,0
+    00B35 9100 0084 LDS	R16,kprop_i
+    00B37 9110 0085 LDS	R17,kprop_i+1
+    00B39 940E 0DFE CALL	div16u
+    00B3B E02A      LDI	R18,0xA
+    00B3C E030      LDI	R19,0
+    00B3D 940E 0DFC CALL	mod16u
+    00B3F 9300 006F STS	dd,R16
+(0775) 						  d=kprop_i%10;
+    00B41 E02A      LDI	R18,0xA
+    00B42 E030      LDI	R19,0
+    00B43 9100 0084 LDS	R16,kprop_i
+    00B45 9110 0085 LDS	R17,kprop_i+1
+    00B47 940E 0DFC CALL	mod16u
+    00B49 9300 006E STS	d,R16
+(0776) 						  data=0x09;
+    00B4B E089      LDI	R24,0x9
+    00B4C 9380 0060 STS	data,R24
+(0777) 		                  data_ts();
+    00B4E DB5E      RCALL	_data_ts
+(0778) 		                  data=0x0A;
+    00B4F E08A      LDI	R24,0xA
+    00B50 9380 0060 STS	data,R24
+(0779) 		                  data_ts();
+    00B52 DB5A      RCALL	_data_ts
+(0780) 		                  //symbol=ddd;
+(0781) 		                  //digit();
+(0782) 		                  symbol=dd;
+    00B53 9020 006F LDS	R2,dd
+    00B55 9220 0064 STS	symbol,R2
+(0783) 		                  digit();
+    00B57 DBCF      RCALL	_digit
+(0784) 		                  symbol=d;
+    00B58 9020 006E LDS	R2,d
+    00B5A 9220 0064 STS	symbol,R2
+(0785) 		                  digit();
+    00B5C DBCA      RCALL	_digit
+(0786) 		                  flag=10;
+    00B5D E08A      LDI	R24,0xA
+    00B5E 9380 0066 STS	flag,R24
+(0787) 						  flag2=1;
+    00B60 E081      LDI	R24,1
+    00B61 9380 0068 STS	flag2,R24
+(0788) 						  cnt2=0;
+    00B63 2422      CLR	R2
+    00B64 2433      CLR	R3
+    00B65 9230 006D STS	cnt2+1,R3
+    00B67 9220 006C STS	cnt2,R2
+(0789) 						  break;
+    00B69 C28F      RJMP	0x0DF9
+(0790) 				case 0x10: for(cnt=0;cnt<10;cnt++)//tinteg_i
+    00B6A 2422      CLR	R2
+    00B6B 9220 0069 STS	cnt,R2
+    00B6D C010      RJMP	0x0B7E
+(0791) 	                      {
+(0792) 	                      data=mass4[cnt];
+    00B6E E48D      LDI	R24,0x4D
+    00B6F E091      LDI	R25,1
+    00B70 91E0 0069 LDS	R30,cnt
+    00B72 27FF      CLR	R31
+    00B73 0FE8      ADD	R30,R24
+    00B74 1FF9      ADC	R31,R25
+    00B75 8020      LD	R2,Z
+    00B76 9220 0060 STS	data,R2
+(0793) 	                      data_ts();
+    00B78 DB34      RCALL	_data_ts
+    00B79 9180 0069 LDS	R24,cnt
+    00B7B 5F8F      SUBI	R24,0xFF
+    00B7C 9380 0069 STS	cnt,R24
+    00B7E 9180 0069 LDS	R24,cnt
+    00B80 308A      CPI	R24,0xA
+    00B81 F360      BCS	0x0B6E
+(0794) 	                      }
+(0795) 			              ddd=tinteg_i/100;
+    00B82 E624      LDI	R18,0x64
+    00B83 E030      LDI	R19,0
+    00B84 9100 0086 LDS	R16,tinteg_i
+    00B86 9110 0087 LDS	R17,tinteg_i+1
+    00B88 940E 0DFE CALL	div16u
+    00B8A 9300 0070 STS	ddd,R16
+(0796) 			              dd=(tinteg_i/10)%10;
+    00B8C E02A      LDI	R18,0xA
+    00B8D E030      LDI	R19,0
+    00B8E 9100 0086 LDS	R16,tinteg_i
+    00B90 9110 0087 LDS	R17,tinteg_i+1
+    00B92 940E 0DFE CALL	div16u
+    00B94 E02A      LDI	R18,0xA
+    00B95 E030      LDI	R19,0
+    00B96 940E 0DFC CALL	mod16u
+    00B98 9300 006F STS	dd,R16
+(0797) 						  d=tinteg_i%10;
+    00B9A E02A      LDI	R18,0xA
+    00B9B E030      LDI	R19,0
+    00B9C 9100 0086 LDS	R16,tinteg_i
+    00B9E 9110 0087 LDS	R17,tinteg_i+1
+    00BA0 940E 0DFC CALL	mod16u
+    00BA2 9300 006E STS	d,R16
+(0798) 						  data=0x09;
+    00BA4 E089      LDI	R24,0x9
+    00BA5 9380 0060 STS	data,R24
+(0799) 		                  data_ts();
+    00BA7 DB05      RCALL	_data_ts
+(0800) 		                  data=0x08;
+    00BA8 E088      LDI	R24,0x8
+    00BA9 9380 0060 STS	data,R24
+(0801) 		                  data_ts();
+    00BAB DB01      RCALL	_data_ts
+(0802) 		                  symbol=ddd;
+    00BAC 9020 0070 LDS	R2,ddd
+    00BAE 9220 0064 STS	symbol,R2
+(0803) 		                  digit();
+    00BB0 DB76      RCALL	_digit
+(0804) 		                  symbol=dd;
+    00BB1 9020 006F LDS	R2,dd
+    00BB3 9220 0064 STS	symbol,R2
+(0805) 		                  digit();
+    00BB5 DB71      RCALL	_digit
+(0806) 		                  symbol=d;
+    00BB6 9020 006E LDS	R2,d
+    00BB8 9220 0064 STS	symbol,R2
+(0807) 		                  digit();
+    00BBA DB6C      RCALL	_digit
+(0808) 		                  flag=10;
+    00BBB E08A      LDI	R24,0xA
+    00BBC 9380 0066 STS	flag,R24
+(0809) 						  flag2=1;
+    00BBE E081      LDI	R24,1
+    00BBF 9380 0068 STS	flag2,R24
+(0810) 						  cnt2=0;
+    00BC1 2422      CLR	R2
+    00BC2 2433      CLR	R3
+    00BC3 9230 006D STS	cnt2+1,R3
+    00BC5 9220 006C STS	cnt2,R2
+(0811) 						  break;
+    00BC7 C231      RJMP	0x0DF9
+(0812) 				case 0x20: for(cnt=0;cnt<10;cnt++)//kprop_v
+    00BC8 2422      CLR	R2
+    00BC9 9220 0069 STS	cnt,R2
+    00BCB C010      RJMP	0x0BDC
+(0813) 	                      {
+(0814) 	                      data=mass5[cnt];
+    00BCC E587      LDI	R24,0x57
+    00BCD E091      LDI	R25,1
+    00BCE 91E0 0069 LDS	R30,cnt
+    00BD0 27FF      CLR	R31
+    00BD1 0FE8      ADD	R30,R24
+    00BD2 1FF9      ADC	R31,R25
+    00BD3 8020      LD	R2,Z
+    00BD4 9220 0060 STS	data,R2
+(0815) 	                      data_ts();
+    00BD6 DAD6      RCALL	_data_ts
+    00BD7 9180 0069 LDS	R24,cnt
+    00BD9 5F8F      SUBI	R24,0xFF
+    00BDA 9380 0069 STS	cnt,R24
+    00BDC 9180 0069 LDS	R24,cnt
+    00BDE 308A      CPI	R24,0xA
+    00BDF F360      BCS	0x0BCC
+(0816) 	                      }
+(0817) 			              ddd=kprop_v/100;
+    00BE0 E624      LDI	R18,0x64
+    00BE1 E030      LDI	R19,0
+    00BE2 9100 008C LDS	R16,kprop_v
+    00BE4 9110 008D LDS	R17,kprop_v+1
+    00BE6 940E 0DFE CALL	div16u
+    00BE8 9300 0070 STS	ddd,R16
+(0818) 			              dd=(kprop_v/10)%10;
+    00BEA E02A      LDI	R18,0xA
+    00BEB E030      LDI	R19,0
+    00BEC 9100 008C LDS	R16,kprop_v
+    00BEE 9110 008D LDS	R17,kprop_v+1
+    00BF0 940E 0DFE CALL	div16u
+    00BF2 E02A      LDI	R18,0xA
+    00BF3 E030      LDI	R19,0
+    00BF4 940E 0DFC CALL	mod16u
+    00BF6 9300 006F STS	dd,R16
+(0819) 						  d=kprop_v%10;
+    00BF8 E02A      LDI	R18,0xA
+    00BF9 E030      LDI	R19,0
+    00BFA 9100 008C LDS	R16,kprop_v
+    00BFC 9110 008D LDS	R17,kprop_v+1
+    00BFE 940E 0DFC CALL	mod16u
+    00C00 9300 006E STS	d,R16
+(0820) 						  data=0x09;
+    00C02 E089      LDI	R24,0x9
+    00C03 9380 0060 STS	data,R24
+(0821) 		                  data_ts();
+    00C05 DAA7      RCALL	_data_ts
+(0822) 		                  data=0x08;
+    00C06 E088      LDI	R24,0x8
+    00C07 9380 0060 STS	data,R24
+(0823) 		                  data_ts();
+    00C09 DAA3      RCALL	_data_ts
+(0824) 		                  symbol=ddd;
+    00C0A 9020 0070 LDS	R2,ddd
+    00C0C 9220 0064 STS	symbol,R2
+(0825) 		                  digit();
+    00C0E DB18      RCALL	_digit
+(0826) 		                  symbol=dd;
+    00C0F 9020 006F LDS	R2,dd
+    00C11 9220 0064 STS	symbol,R2
+(0827) 		                  digit();
+    00C13 DB13      RCALL	_digit
+(0828) 		                  symbol=d;
+    00C14 9020 006E LDS	R2,d
+    00C16 9220 0064 STS	symbol,R2
+(0829) 		                  digit();
+    00C18 DB0E      RCALL	_digit
+(0830) 		                  flag=10;
+    00C19 E08A      LDI	R24,0xA
+    00C1A 9380 0066 STS	flag,R24
+(0831) 						  flag2=1;
+    00C1C E081      LDI	R24,1
+    00C1D 9380 0068 STS	flag2,R24
+(0832) 						  cnt2=0;
+    00C1F 2422      CLR	R2
+    00C20 2433      CLR	R3
+    00C21 9230 006D STS	cnt2+1,R3
+    00C23 9220 006C STS	cnt2,R2
+(0833) 						  break;
+    00C25 C1D3      RJMP	0x0DF9
+(0834) 				 case 0x30: for(cnt=0;cnt<10;cnt++)//tinteg_v
+    00C26 2422      CLR	R2
+    00C27 9220 0069 STS	cnt,R2
+    00C29 C010      RJMP	0x0C3A
+(0835) 	                      {
+(0836) 	                      data=mass6[cnt];
+    00C2A E681      LDI	R24,0x61
+    00C2B E091      LDI	R25,1
+    00C2C 91E0 0069 LDS	R30,cnt
+    00C2E 27FF      CLR	R31
+    00C2F 0FE8      ADD	R30,R24
+    00C30 1FF9      ADC	R31,R25
+    00C31 8020      LD	R2,Z
+    00C32 9220 0060 STS	data,R2
+(0837) 	                      data_ts();
+    00C34 DA78      RCALL	_data_ts
+    00C35 9180 0069 LDS	R24,cnt
+    00C37 5F8F      SUBI	R24,0xFF
+    00C38 9380 0069 STS	cnt,R24
+    00C3A 9180 0069 LDS	R24,cnt
+    00C3C 308A      CPI	R24,0xA
+    00C3D F360      BCS	0x0C2A
+(0838) 	                      }
+(0839) 			              ddd=tinteg_v/100;
+    00C3E E624      LDI	R18,0x64
+    00C3F E030      LDI	R19,0
+    00C40 9100 008E LDS	R16,tinteg_v
+    00C42 9110 008F LDS	R17,tinteg_v+1
+    00C44 940E 0DFE CALL	div16u
+    00C46 9300 0070 STS	ddd,R16
+(0840) 			              dd=(tinteg_v/10)%10;
+    00C48 E02A      LDI	R18,0xA
+    00C49 E030      LDI	R19,0
+    00C4A 9100 008E LDS	R16,tinteg_v
+    00C4C 9110 008F LDS	R17,tinteg_v+1
+    00C4E 940E 0DFE CALL	div16u
+    00C50 E02A      LDI	R18,0xA
+    00C51 E030      LDI	R19,0
+    00C52 940E 0DFC CALL	mod16u
+    00C54 9300 006F STS	dd,R16
+(0841) 						  d=tinteg_v%10;
+    00C56 E02A      LDI	R18,0xA
+    00C57 E030      LDI	R19,0
+    00C58 9100 008E LDS	R16,tinteg_v
+    00C5A 9110 008F LDS	R17,tinteg_v+1
+    00C5C 940E 0DFC CALL	mod16u
+    00C5E 9300 006E STS	d,R16
+(0842) 						  data=0x09;
+    00C60 E089      LDI	R24,0x9
+    00C61 9380 0060 STS	data,R24
+(0843) 		                  data_ts();
+    00C63 DA49      RCALL	_data_ts
+(0844) 		                  data=0x08;
+    00C64 E088      LDI	R24,0x8
+    00C65 9380 0060 STS	data,R24
+(0845) 		                  data_ts();
+    00C67 DA45      RCALL	_data_ts
+(0846) 		                  symbol=ddd;
+    00C68 9020 0070 LDS	R2,ddd
+    00C6A 9220 0064 STS	symbol,R2
+(0847) 		                  digit();
+    00C6C DABA      RCALL	_digit
+(0848) 		                  symbol=dd;
+    00C6D 9020 006F LDS	R2,dd
+    00C6F 9220 0064 STS	symbol,R2
+(0849) 		                  digit();
+    00C71 DAB5      RCALL	_digit
+(0850) 		                  symbol=d;
+    00C72 9020 006E LDS	R2,d
+    00C74 9220 0064 STS	symbol,R2
+(0851) 		                  digit();
+    00C76 DAB0      RCALL	_digit
+(0852) 		                  flag=10;
+    00C77 E08A      LDI	R24,0xA
+    00C78 9380 0066 STS	flag,R24
+(0853) 						  flag2=1;
+    00C7A E081      LDI	R24,1
+    00C7B 9380 0068 STS	flag2,R24
+(0854) 						  cnt2=0;
+    00C7D 2422      CLR	R2
+    00C7E 2433      CLR	R3
+    00C7F 9230 006D STS	cnt2+1,R3
+    00C81 9220 006C STS	cnt2,R2
+(0855) 						  break;
+    00C83 C175      RJMP	0x0DF9
+(0856) 				  case 0x40: for(cnt=0;cnt<10;cnt++)//kos_i
+    00C84 2422      CLR	R2
+    00C85 9220 0069 STS	cnt,R2
+    00C87 C010      RJMP	0x0C98
+(0857) 	                      {
+(0858) 	                      data=mass7[cnt];
+    00C88 E68B      LDI	R24,0x6B
+    00C89 E091      LDI	R25,1
+    00C8A 91E0 0069 LDS	R30,cnt
+    00C8C 27FF      CLR	R31
+    00C8D 0FE8      ADD	R30,R24
+    00C8E 1FF9      ADC	R31,R25
+    00C8F 8020      LD	R2,Z
+    00C90 9220 0060 STS	data,R2
+(0859) 	                      data_ts();
+    00C92 DA1A      RCALL	_data_ts
+    00C93 9180 0069 LDS	R24,cnt
+    00C95 5F8F      SUBI	R24,0xFF
+    00C96 9380 0069 STS	cnt,R24
+    00C98 9180 0069 LDS	R24,cnt
+    00C9A 308A      CPI	R24,0xA
+    00C9B F360      BCS	0x0C88
+(0860) 	                      }
+(0861) 			              ddd=kos_i/100;
+    00C9C E624      LDI	R18,0x64
+    00C9D E030      LDI	R19,0
+    00C9E 9100 0094 LDS	R16,kos_i
+    00CA0 9110 0095 LDS	R17,kos_i+1
+    00CA2 940E 0DFE CALL	div16u
+    00CA4 9300 0070 STS	ddd,R16
+(0862) 			              dd=(kos_i/10)%10;
+    00CA6 E02A      LDI	R18,0xA
+    00CA7 E030      LDI	R19,0
+    00CA8 9100 0094 LDS	R16,kos_i
+    00CAA 9110 0095 LDS	R17,kos_i+1
+    00CAC 940E 0DFE CALL	div16u
+    00CAE E02A      LDI	R18,0xA
+    00CAF E030      LDI	R19,0
+    00CB0 940E 0DFC CALL	mod16u
+    00CB2 9300 006F STS	dd,R16
+(0863) 						  d=kos_i%10;
+    00CB4 E02A      LDI	R18,0xA
+    00CB5 E030      LDI	R19,0
+    00CB6 9100 0094 LDS	R16,kos_i
+    00CB8 9110 0095 LDS	R17,kos_i+1
+    00CBA 940E 0DFC CALL	mod16u
+    00CBC 9300 006E STS	d,R16
+(0864) 						  data=0x09;
+    00CBE E089      LDI	R24,0x9
+    00CBF 9380 0060 STS	data,R24
+(0865) 		                  data_ts();
+    00CC1 D9EB      RCALL	_data_ts
+(0866) 		                  data=0x08;
+    00CC2 E088      LDI	R24,0x8
+    00CC3 9380 0060 STS	data,R24
+(0867) 		                  data_ts();
+    00CC5 D9E7      RCALL	_data_ts
+(0868) 		                  symbol=ddd;
+    00CC6 9020 0070 LDS	R2,ddd
+    00CC8 9220 0064 STS	symbol,R2
+(0869) 		                  digit();
+    00CCA DA5C      RCALL	_digit
+(0870) 		                  symbol=dd;
+    00CCB 9020 006F LDS	R2,dd
+    00CCD 9220 0064 STS	symbol,R2
+(0871) 		                  digit();
+    00CCF DA57      RCALL	_digit
+(0872) 		                  symbol=d;
+    00CD0 9020 006E LDS	R2,d
+    00CD2 9220 0064 STS	symbol,R2
+(0873) 		                  digit();
+    00CD4 DA52      RCALL	_digit
+(0874) 		                  flag=10;
+    00CD5 E08A      LDI	R24,0xA
+    00CD6 9380 0066 STS	flag,R24
+(0875) 						  flag2=1;
+    00CD8 E081      LDI	R24,1
+    00CD9 9380 0068 STS	flag2,R24
+(0876) 						  cnt2=0;
+    00CDB 2422      CLR	R2
+    00CDC 2433      CLR	R3
+    00CDD 9230 006D STS	cnt2+1,R3
+    00CDF 9220 006C STS	cnt2,R2
+(0877) 						  break;
+    00CE1 C117      RJMP	0x0DF9
+(0878) 				  case 0x50: for(cnt=0;cnt<10;cnt++)//kos_v
+    00CE2 2422      CLR	R2
+    00CE3 9220 0069 STS	cnt,R2
+    00CE5 C010      RJMP	0x0CF6
+(0879) 	                      {
+(0880) 	                      data=mass8[cnt];
+    00CE6 E785      LDI	R24,0x75
+    00CE7 E091      LDI	R25,1
+    00CE8 91E0 0069 LDS	R30,cnt
+    00CEA 27FF      CLR	R31
+    00CEB 0FE8      ADD	R30,R24
+    00CEC 1FF9      ADC	R31,R25
+    00CED 8020      LD	R2,Z
+    00CEE 9220 0060 STS	data,R2
+(0881) 	                      data_ts();
+    00CF0 D9BC      RCALL	_data_ts
+    00CF1 9180 0069 LDS	R24,cnt
+    00CF3 5F8F      SUBI	R24,0xFF
+    00CF4 9380 0069 STS	cnt,R24
+    00CF6 9180 0069 LDS	R24,cnt
+    00CF8 308A      CPI	R24,0xA
+    00CF9 F360      BCS	0x0CE6
+(0882) 	                      }
+(0883) 			              ddd=kos_v/100;
+    00CFA E624      LDI	R18,0x64
+    00CFB E030      LDI	R19,0
+    00CFC 9100 0096 LDS	R16,kos_v
+    00CFE 9110 0097 LDS	R17,kos_v+1
+    00D00 940E 0DFE CALL	div16u
+    00D02 9300 0070 STS	ddd,R16
+(0884) 			              dd=(kos_v/10)%10;
+    00D04 E02A      LDI	R18,0xA
+    00D05 E030      LDI	R19,0
+    00D06 9100 0096 LDS	R16,kos_v
+    00D08 9110 0097 LDS	R17,kos_v+1
+    00D0A 940E 0DFE CALL	div16u
+    00D0C E02A      LDI	R18,0xA
+    00D0D E030      LDI	R19,0
+    00D0E 940E 0DFC CALL	mod16u
+    00D10 9300 006F STS	dd,R16
+(0885) 						  d=kos_v%10;
+    00D12 E02A      LDI	R18,0xA
+    00D13 E030      LDI	R19,0
+    00D14 9100 0096 LDS	R16,kos_v
+    00D16 9110 0097 LDS	R17,kos_v+1
+    00D18 940E 0DFC CALL	mod16u
+    00D1A 9300 006E STS	d,R16
+(0886) 						  data=0x09;
+    00D1C E089      LDI	R24,0x9
+    00D1D 9380 0060 STS	data,R24
+(0887) 		                  data_ts();
+    00D1F D98D      RCALL	_data_ts
+(0888) 		                  data=0x08;
+    00D20 E088      LDI	R24,0x8
+    00D21 9380 0060 STS	data,R24
+(0889) 		                  data_ts();
+    00D23 D989      RCALL	_data_ts
+(0890) 		                  symbol=ddd;
+    00D24 9020 0070 LDS	R2,ddd
+    00D26 9220 0064 STS	symbol,R2
+(0891) 		                  digit();
+    00D28 D9FE      RCALL	_digit
+(0892) 		                  symbol=dd;
+    00D29 9020 006F LDS	R2,dd
+    00D2B 9220 0064 STS	symbol,R2
+(0893) 		                  digit();
+    00D2D D9F9      RCALL	_digit
+(0894) 		                  symbol=d;
+    00D2E 9020 006E LDS	R2,d
+    00D30 9220 0064 STS	symbol,R2
+(0895) 		                  digit();
+    00D32 D9F4      RCALL	_digit
+(0896) 		                  flag=10;
+    00D33 E08A      LDI	R24,0xA
+    00D34 9380 0066 STS	flag,R24
+(0897) 						  flag2=1;
+    00D36 E081      LDI	R24,1
+    00D37 9380 0068 STS	flag2,R24
+(0898) 						  cnt2=0;
+    00D39 2422      CLR	R2
+    00D3A 2433      CLR	R3
+    00D3B 9230 006D STS	cnt2+1,R3
+    00D3D 9220 006C STS	cnt2,R2
+(0899) 						  break;
+    00D3F C0B9      RJMP	0x0DF9
+(0900) 				  case 0x60: for(cnt=0;cnt<16;cnt++)//fkvant
+    00D40 2422      CLR	R2
+    00D41 9220 0069 STS	cnt,R2
+    00D43 C010      RJMP	0x0D54
+(0901) 	                      {
+(0902) 	                      data=mass9[cnt];
+    00D44 E78F      LDI	R24,0x7F
+    00D45 E091      LDI	R25,1
+    00D46 91E0 0069 LDS	R30,cnt
+    00D48 27FF      CLR	R31
+    00D49 0FE8      ADD	R30,R24
+    00D4A 1FF9      ADC	R31,R25
+    00D4B 8020      LD	R2,Z
+    00D4C 9220 0060 STS	data,R2
+(0903) 	                      data_ts();
+    00D4E D95E      RCALL	_data_ts
+    00D4F 9180 0069 LDS	R24,cnt
+    00D51 5F8F      SUBI	R24,0xFF
+    00D52 9380 0069 STS	cnt,R24
+    00D54 9180 0069 LDS	R24,cnt
+    00D56 3180      CPI	R24,0x10
+    00D57 F360      BCS	0x0D44
+(0904) 	                      }
+(0905) 			              ddd=fkvant/100;
+    00D58 E624      LDI	R18,0x64
+    00D59 E030      LDI	R19,0
+    00D5A 9100 009C LDS	R16,fkvant
+    00D5C 9110 009D LDS	R17,fkvant+1
+    00D5E 940E 0DFE CALL	div16u
+    00D60 9300 0070 STS	ddd,R16
+(0906) 			              dd=(fkvant/10)%10;
+    00D62 E02A      LDI	R18,0xA
+    00D63 E030      LDI	R19,0
+    00D64 9100 009C LDS	R16,fkvant
+    00D66 9110 009D LDS	R17,fkvant+1
+    00D68 940E 0DFE CALL	div16u
+    00D6A E02A      LDI	R18,0xA
+    00D6B E030      LDI	R19,0
+    00D6C 940E 0DFC CALL	mod16u
+    00D6E 9300 006F STS	dd,R16
+(0907) 						  d=fkvant%10;
+    00D70 E02A      LDI	R18,0xA
+    00D71 E030      LDI	R19,0
+    00D72 9100 009C LDS	R16,fkvant
+    00D74 9110 009D LDS	R17,fkvant+1
+    00D76 940E 0DFC CALL	mod16u
+    00D78 9300 006E STS	d,R16
+(0908) 						  data=0x09;
+    00D7A E089      LDI	R24,0x9
+    00D7B 9380 0060 STS	data,R24
+(0909) 		                  data_ts();
+    00D7D D92F      RCALL	_data_ts
+(0910) 		                  data=0x08;
+    00D7E E088      LDI	R24,0x8
+    00D7F 9380 0060 STS	data,R24
+(0911) 		                  data_ts();
+    00D81 D92B      RCALL	_data_ts
+(0912) 		                  //symbol=ddd;
+(0913) 		                  //digit();
+(0914) 		                  symbol=dd;
+    00D82 9020 006F LDS	R2,dd
+    00D84 9220 0064 STS	symbol,R2
+(0915) 		                  digit();
+    00D86 D9A0      RCALL	_digit
+(0916) 		                  symbol=d;
+    00D87 9020 006E LDS	R2,d
+    00D89 9220 0064 STS	symbol,R2
+(0917) 		                  digit();
+    00D8B D99B      RCALL	_digit
+(0918) 		                  flag=10;
+    00D8C E08A      LDI	R24,0xA
+    00D8D 9380 0066 STS	flag,R24
+(0919) 						  flag2=1;
+    00D8F E081      LDI	R24,1
+    00D90 9380 0068 STS	flag2,R24
+(0920) 						  cnt2=0;
+    00D92 2422      CLR	R2
+    00D93 2433      CLR	R3
+    00D94 9230 006D STS	cnt2+1,R3
+    00D96 9220 006C STS	cnt2,R2
+(0921) 						  break;
+    00D98 C060      RJMP	0x0DF9
+(0922) 					case 0x70: for(cnt=0;cnt<14;cnt++)//iupor
+    00D99 2422      CLR	R2
+    00D9A 9220 0069 STS	cnt,R2
+    00D9C C010      RJMP	0x0DAD
+(0923) 	                      {
+(0924) 	                      data=mass10[cnt];
+    00D9D E88F      LDI	R24,0x8F
+    00D9E E091      LDI	R25,1
+    00D9F 91E0 0069 LDS	R30,cnt
+    00DA1 27FF      CLR	R31
+    00DA2 0FE8      ADD	R30,R24
+    00DA3 1FF9      ADC	R31,R25
+    00DA4 8020      LD	R2,Z
+    00DA5 9220 0060 STS	data,R2
+(0925) 	                      data_ts();
+    00DA7 D905      RCALL	_data_ts
+    00DA8 9180 0069 LDS	R24,cnt
+    00DAA 5F8F      SUBI	R24,0xFF
+    00DAB 9380 0069 STS	cnt,R24
+    00DAD 9180 0069 LDS	R24,cnt
+    00DAF 308E      CPI	R24,0xE
+    00DB0 F360      BCS	0x0D9D
+(0926) 	                      }
+(0927) 			              ddd=iupor/100;
+    00DB1 E624      LDI	R18,0x64
+    00DB2 E030      LDI	R19,0
+    00DB3 9100 009E LDS	R16,iupor
+    00DB5 9110 009F LDS	R17,iupor+1
+    00DB7 940E 0DFE CALL	div16u
+    00DB9 9300 0070 STS	ddd,R16
+(0928) 			              dd=(iupor/10)%10;
+    00DBB E02A      LDI	R18,0xA
+    00DBC E030      LDI	R19,0
+    00DBD 9100 009E LDS	R16,iupor
+    00DBF 9110 009F LDS	R17,iupor+1
+    00DC1 940E 0DFE CALL	div16u
+    00DC3 E02A      LDI	R18,0xA
+    00DC4 E030      LDI	R19,0
+    00DC5 940E 0DFC CALL	mod16u
+    00DC7 9300 006F STS	dd,R16
+(0929) 						  d=iupor%10;
+    00DC9 E02A      LDI	R18,0xA
+    00DCA E030      LDI	R19,0
+    00DCB 9100 009E LDS	R16,iupor
+    00DCD 9110 009F LDS	R17,iupor+1
+    00DCF 940E 0DFC CALL	mod16u
+    00DD1 9300 006E STS	d,R16
+(0930) 						  data=0x09;
+    00DD3 E089      LDI	R24,0x9
+    00DD4 9380 0060 STS	data,R24
+(0931) 		                  data_ts();
+    00DD6 D8D6      RCALL	_data_ts
+(0932) 		                  data=0x07;
+    00DD7 E087      LDI	R24,7
+    00DD8 9380 0060 STS	data,R24
+(0933) 		                  data_ts();
+    00DDA D8D2      RCALL	_data_ts
+(0934) 		                  //symbol=ddd;
+(0935) 		                  //digit();
+(0936) 						  symbol=dd;
+    00DDB 9020 006F LDS	R2,dd
+    00DDD 9220 0064 STS	symbol,R2
+(0937) 		                  digit();
+    00DDF D947      RCALL	_digit
+(0938) 						  data=0x22;
+    00DE0 E282      LDI	R24,0x22
+    00DE1 9380 0060 STS	data,R24
+(0939) 		                  data_ts();
+    00DE3 D8C9      RCALL	_data_ts
+(0940) 		                  data=0x2C;
+    00DE4 E28C      LDI	R24,0x2C
+    00DE5 9380 0060 STS	data,R24
+(0941) 		                  data_ts();//,
+    00DE7 D8C5      RCALL	_data_ts
+(0942) 		                  symbol=d;
+    00DE8 9020 006E LDS	R2,d
+    00DEA 9220 0064 STS	symbol,R2
+(0943) 		                  digit();
+    00DEC D93A      RCALL	_digit
+(0944) 		                  flag=10;
+    00DED E08A      LDI	R24,0xA
+    00DEE 9380 0066 STS	flag,R24
+(0945) 						  flag2=1;
+    00DF0 E081      LDI	R24,1
+    00DF1 9380 0068 STS	flag2,R24
+(0946) 						  cnt2=0;
+    00DF3 2422      CLR	R2
+    00DF4 2433      CLR	R3
+    00DF5 9230 006D STS	cnt2+1,R3
+    00DF7 9220 006C STS	cnt2,R2
+(0947) 						  break;  
+(0948) 						  }
+(0949) 	                      case 10: 
+(0950)    		                  ;
+(0951)                           break;
+FILE: <library>
+    00DF9 9159      LD	R21,Y+
+    00DFA 9149      LD	R20,Y+
+    00DFB 9508      RET
+mod16u:
+    00DFC 9468      BSET	6
+    00DFD C001      RJMP	xdiv16u
+div16u:
+    00DFE 94E8      BCLR	6
+xdiv16u:
+    00DFF 92EA      ST	-Y,R14
+    00E00 92FA      ST	-Y,R15
+    00E01 938A      ST	-Y,R24
+    00E02 24EE      CLR	R14
+    00E03 24FF      CLR	R15
+    00E04 E180      LDI	R24,0x10
+    00E05 0F00      LSL	R16
+    00E06 1F11      ROL	R17
+    00E07 1CEE      ROL	R14
+    00E08 1CFF      ROL	R15
+    00E09 16E2      CP	R14,R18
+    00E0A 06F3      CPC	R15,R19
+    00E0B F018      BCS	0x0E0F
+    00E0C 1AE2      SUB	R14,R18
+    00E0D 0AF3      SBC	R15,R19
+    00E0E 9503      INC	R16
+    00E0F 958A      DEC	R24
+    00E10 F7A1      BNE	0x0E05
+    00E11 F416      BRTC	0x0E14
+    00E12 2D0E      MOV	R16,R14
+    00E13 2D1F      MOV	R17,R15
+    00E14 9189      LD	R24,Y+
+    00E15 90F9      LD	R15,Y+
+    00E16 90E9      LD	R14,Y+
+    00E17 9508      RET
+div32u:
+    00E18 94E8      BCLR	6
+    00E19 C001      RJMP	0x0E1B
+mod32u:
+    00E1A 9468      BSET	6
+    00E1B D030      RCALL	long_div_prolog
+    00E1C 24CC      CLR	R12
+    00E1D C009      RJMP	0x0E27
+div32s:
+    00E1E 94E8      BCLR	6
+    00E1F C001      RJMP	0x0E21
+mod32s:
+    00E20 9468      BSET	6
+    00E21 D02A      RCALL	long_div_prolog
+    00E22 FD37      SBRC	R19,7
+    00E23 940E 0E9C CALL	neg32
+    00E25 FDB7      SBRC	R27,7
+    00E26 D052      RCALL	neg_R24_R27
+    00E27 2477      CLR	R7
+    00E28 2488      CLR	R8
+    00E29 2499      CLR	R9
+    00E2A 24AA      CLR	R10
+    00E2B 24BB      CLR	R11
+    00E2C D042      RCALL	tst_R16_R19
+    00E2D F0C1      BEQ	0x0E46
+    00E2E D045      RCALL	tst_R24_R27
+    00E2F F0B1      BEQ	0x0E46
+    00E30 E2E8      LDI	R30,0x28
+    00E31 0F00      LSL	R16
+    00E32 1F11      ROL	R17
+    00E33 1F22      ROL	R18
+    00E34 1F33      ROL	R19
+    00E35 1C77      ROL	R7
+    00E36 1C88      ROL	R8
+    00E37 1C99      ROL	R9
+    00E38 1CAA      ROL	R10
+    00E39 1CBB      ROL	R11
+    00E3A 1688      CP	R8,R24
+    00E3B 0699      CPC	R9,R25
+    00E3C 06AA      CPC	R10,R26
+    00E3D 06BB      CPC	R11,R27
+    00E3E F028      BCS	0x0E44
+    00E3F 1A88      SUB	R8,R24
+    00E40 0A99      SBC	R9,R25
+    00E41 0AAA      SBC	R10,R26
+    00E42 0ABB      SBC	R11,R27
+    00E43 9503      INC	R16
+    00E44 95EA      DEC	R30
+    00E45 F759      BNE	0x0E31
+    00E46 F426      BRTC	0x0E4B
+    00E47 2D08      MOV	R16,R8
+    00E48 2D19      MOV	R17,R9
+    00E49 2D2A      MOV	R18,R10
+    00E4A 2D3B      MOV	R19,R11
+    00E4B C013      RJMP	long_div_epilog
+long_div_prolog:
+    00E4C 927A      ST	-Y,R7
+    00E4D 928A      ST	-Y,R8
+    00E4E 929A      ST	-Y,R9
+    00E4F 92AA      ST	-Y,R10
+    00E50 92BA      ST	-Y,R11
+    00E51 92CA      ST	-Y,R12
+    00E52 93EA      ST	-Y,R30
+    00E53 938A      ST	-Y,R24
+    00E54 939A      ST	-Y,R25
+    00E55 93AA      ST	-Y,R26
+    00E56 93BA      ST	-Y,R27
+    00E57 858B      LDD	R24,Y+11
+    00E58 859C      LDD	R25,Y+12
+    00E59 85AD      LDD	R26,Y+13
+    00E5A 85BE      LDD	R27,Y+14
+    00E5B 2EC3      MOV	R12,R19
+    00E5C F00E      BRTS	0x0E5E
+    00E5D 26CB      EOR	R12,R27
+    00E5E 9508      RET
+long_div_epilog:
+    00E5F FCC7      SBRC	R12,7
+    00E60 940E 0E9C CALL	neg32
+    00E62 91B9      LD	R27,Y+
+    00E63 91A9      LD	R26,Y+
+    00E64 9199      LD	R25,Y+
+    00E65 9189      LD	R24,Y+
+    00E66 91E9      LD	R30,Y+
+    00E67 90C9      LD	R12,Y+
+    00E68 90B9      LD	R11,Y+
+    00E69 90A9      LD	R10,Y+
+    00E6A 9099      LD	R9,Y+
+    00E6B 9089      LD	R8,Y+
+    00E6C 9079      LD	R7,Y+
+    00E6D 9624      ADIW	R28,4
+    00E6E 9508      RET
+tst_R16_R19:
+    00E6F 2FE0      MOV	R30,R16
+    00E70 2BE1      OR	R30,R17
+    00E71 2BE2      OR	R30,R18
+    00E72 2BE3      OR	R30,R19
+    00E73 9508      RET
+tst_R24_R27:
+    00E74 2FE8      MOV	R30,R24
+    00E75 2BE9      OR	R30,R25
+    00E76 2BEA      OR	R30,R26
+    00E77 2BEB      OR	R30,R27
+    00E78 9508      RET
+neg_R24_R27:
+    00E79 9580      COM	R24
+    00E7A 9590      COM	R25
+    00E7B 95A0      COM	R26
+    00E7C 95B0      COM	R27
+    00E7D 5F8F      SUBI	R24,0xFF
+    00E7E 4F9F      SBCI	R25,0xFF
+    00E7F 4FAF      SBCI	R26,0xFF
+    00E80 4FBF      SBCI	R27,0xFF
+    00E81 9508      RET
+empy16s:
+    00E82 920A      ST	-Y,R0
+    00E83 921A      ST	-Y,R1
+    00E84 938A      ST	-Y,R24
+    00E85 939A      ST	-Y,R25
+    00E86 9F02      MUL	R16,R18
+    00E87 01C0      MOVW	R24,R0
+    00E88 9F12      MUL	R17,R18
+    00E89 0D90      ADD	R25,R0
+    00E8A 9F03      MUL	R16,R19
+    00E8B 0D90      ADD	R25,R0
+    00E8C 018C      MOVW	R16,R24
+    00E8D 9199      LD	R25,Y+
+    00E8E 9189      LD	R24,Y+
+    00E8F 9019      LD	R1,Y+
+    00E90 9009      LD	R0,Y+
+    00E91 9508      RET
+push_xgset300C:
+    00E92 935A      ST	-Y,R21
+    00E93 934A      ST	-Y,R20
+    00E94 92BA      ST	-Y,R11
+    00E95 92AA      ST	-Y,R10
+    00E96 9508      RET
+pop_xgset300C:
+    00E97 90A9      LD	R10,Y+
+    00E98 90B9      LD	R11,Y+
+    00E99 9149      LD	R20,Y+
+    00E9A 9159      LD	R21,Y+
+    00E9B 9508      RET
+neg32:
+    00E9C 9500      COM	R16
+    00E9D 9510      COM	R17
+    00E9E 9520      COM	R18
+    00E9F 9530      COM	R19
+    00EA0 5F0F      SUBI	R16,0xFF
+    00EA1 4F1F      SBCI	R17,0xFF
+    00EA2 4F2F      SBCI	R18,0xFF
+    00EA3 4F3F      SBCI	R19,0xFF
+    00EA4 9508      RET
+lsl16:
+    00EA5 2322      TST	R18
+    00EA6 F021      BEQ	0x0EAB
+    00EA7 0F00      LSL	R16
+    00EA8 1F11      ROL	R17
+    00EA9 952A      DEC	R18
+    00EAA CFFA      RJMP	lsl16
+    00EAB 9508      RET
+lsr16:
+    00EAC 2322      TST	R18
+    00EAD F021      BEQ	0x0EB2
+    00EAE 9516      LSR	R17
+    00EAF 9507      ROR	R16
+    00EB0 952A      DEC	R18
+    00EB1 CFFA      RJMP	lsr16
+    00EB2 9508      RET

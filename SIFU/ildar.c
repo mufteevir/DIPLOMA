@@ -2,11 +2,11 @@
 // Target : M32
 // Crystal: 8.0000Mhz
 
-#include <iom32v.h>
+#include <iom32v.h>//Include files for Atmega 32 controller
 #include <macros.h>
 
 //------------converter---------------------
-signed int alfa=0;
+signed int alfa=0;//Declaring global variables
 signed int alfa0=1015;//1 deg.=7
 signed int alfamin=35;//1 deg.=7
 signed int alfamax=1190;//1 deg.=7
@@ -39,7 +39,7 @@ unsigned int kprop_v=0, tinteg_v=0, fkvant=0;
 unsigned int kprop_i=0, tinteg_i=0, iupor=0;
 unsigned int kos_v=0, kos_i=0;
 //------------------------------------------
-void init_devices(void)
+void init_devices(void)//the device initialization function
 {
  CLI(); 
  port_init();
@@ -54,8 +54,13 @@ void init_devices(void)
  SEI(); 
 }
 
-void port_init(void)
+void port_init(void)//Function to initialize ports
 {
+	// DDx | Px |  Mode  | resistor | Note
+    // 0   | 0  |  Input | Off      | Pin disconnected from circuit
+	// 0   | 1  |  Input | On       | Pin - current source
+	// 1   | 0  |  Output| Off      | Output "0"
+	// 1   | 1  |  Output| Off      | Output "1"
  PORTA = 0xF8;
  DDRA  = 0x00;
  PORTB = 0x3F;
@@ -66,19 +71,19 @@ void port_init(void)
  DDRD  = 0xB3; //10110011=0xB3
 }
 
-void adc_init(void)
+void adc_init(void)// ADC initialization function
 {
- ADCSRA = 0x00; 
- ADMUX = 0x40;// AVCC reference voltage
- ADCSRA  = 0x8E;//ADEN, clk/64 prescaler (100us conversion time)
+ ADCSRA = 0x00; // Disable interrupt
+ ADMUX = 0x40;// AVCC reference voltage, ADC0
+ ADCSRA  = 0x8E;//ADEN, clk/64 prescaler (100us conversion time)// Single conversion, Kdel=64 (100us - conversion time), // interrupt enable.
 }
 
-void timer0_init(void)
+void timer0_init(void)// Timer T0 initialization function
 {
  TCCR0 = 0x00;
  TCNT0 = 0x00;
- OCR0  = 0x7D;//1 ms gain
- TCCR0 = 0x8B;//clk/64 CTC mode
+ OCR0  = 0x7D;//1 ms gain // Interrupt period - 1 ms
+ TCCR0 = 0x8B;//clk/64 CTC mode // Kdel=64, reset on match
 }
 
 void timer1_init(void)
@@ -110,26 +115,26 @@ void uart0_init(void)
  UCSRC = (1<<URSEL)|(1<<USBS)|(1<<UCSZ1)|(1<<UCSZ0); //8-bit frame
  UBRRL = 0x33;//0x33 - 9600 baud for 8MHz
  UBRRH = 0x00;//
- UCSRB = (1<<RXCIE)|(1<<RXEN)|(1<<TXEN);//RX enable, RX complete int,TX enable
+ UCSRB = (1<<RXCIE)|(1<<RXEN)|(1<<TXEN);//RX enable, RX complete int,TX enable//Enable interrupt on completion of receive, //enable receive, enable transmit
 }
 
-#pragma interrupt_handler adc_isr:iv_ADC
-void adc_isr(void)
+#pragma interrupt_handler adc_isr:iv_ADC// ADC interrupt vector
+void adc_isr(void)// Interrupt handler at the end of the ADC conversion
 {
  CLI();
- value=ADCL;
- value|=ADCH<<8;
- value=value-0x1FF;//2,5V zero point
+ value=ADCL;// Read the low byte of the conversion result,
+ value|=ADCH<<8;//and then the high one and connect them.
+ value=value-0x1FF;//2,5V zero point// 0 is shifted by 2.5V
  switch(ADMUX)
   {
-  case 0x40://Uvh
+  case 0x40://Uvh ADC0
   	   		  	 if(value>=-4&&value<=4) PORTC|=0x80;
                  else PORTC&=0x7F;//zero point indication  
   	   		  	  Uvh=value;
 				  ADMUX=0x41;
 				  ADCSRA|=0x40;//restart ADC
   break;
-  case 0x41://Voltage
+  case 0x41://Voltage ADC1
   	   			  if(value>=-4&&value<=4) PORTC|=0x40;
                   else PORTC&=0xBF;//zero point indication  
   	   		  	  voltage_i[count1]=value;
@@ -142,7 +147,7 @@ void adc_isr(void)
 				    {
 				     volt_i=volt_i+voltage_i[count1];
 				    }
-				   volt_i=volt_i/20;
+				   volt_i=volt_i/20;//average
 				   count1=0;
 				   if(volt_i>=0) 
 					 {
@@ -157,7 +162,7 @@ void adc_isr(void)
 				  ADMUX=0x42;
 				  ADCSRA|=0x40;//restart ADC
   break;
-  case 0x42://Current
+  case 0x42://Current ADC2
   	   			 if(value>=-4&&value<=4) PORTC|=0x20;
                  else PORTC&=0xDF;//zero point indication
   	   			 current_i[count]=value;
@@ -170,7 +175,7 @@ void adc_isr(void)
 				    {
 				    tok_i=tok_i+current_i[count];
 				    }
-				   tok_i=tok_i/20;
+				   tok_i=tok_i/20;//average
 				   count=0;
 				   if(tok_i>=0) 
 					 {
@@ -181,7 +186,7 @@ void adc_isr(void)
 					 sign_current=0;//sign of measured current
 					 tok_i=-tok_i;//modul of measured current
 					 }
-				   if(tok_i>=511) //102-1A; 153-1,5A; 204-2A; 255-2,5A; 306-3A; 358-3,5A; 409-4A, 4,5A
+				   if(tok_i>=511) //102-1A; 153-1,5A; 204-2A; 255-2,5A; 306-3A; 358-3,5A; 409-4A, 511 - 4,5A
 				    {
 					fault=1;
 					PORTC&=0xE0;//switch all pulces off
@@ -193,7 +198,7 @@ void adc_isr(void)
  SEI();
 }
 
-#pragma interrupt_handler int0_isr:iv_INT0
+#pragma interrupt_handler int0_isr:iv_INT0// External interrupt vector INT0
 void int0_isr(void)
 {
 CLI();
@@ -279,17 +284,17 @@ void timer0_comp_isr(void)
  case 10: {OCR0=0xB0; TCCR0=0x8D;} break;//kdel=1024, 10ms
  }
  //-------------------Speed regulator---------------
- if((PINB&0x10)==0x10)
+ if((PINB&0x10)==0x10)//Torque maintenance mode
  {
   Urn=Uvh;
  }
- else
+ else//speed maintenance mode
  {
  oshibka_v=Uvh;
  if(kos_v==0)
  {Urn=Uvh;}
  else { 
- if(kos_v==1) volt_os=volt_os;
+ if(kos_v==1) volt_os=volt_os;//Feedback amplification
  else if(kos_v==2) volt_os=volt_os>>1;
  else if(kos_v==4) volt_os=volt_os>>2;
  else if(kos_v==8) volt_os=volt_os>>3;
@@ -298,7 +303,7 @@ void timer0_comp_isr(void)
  else if(kos_v==64) volt_os=volt_os>>6;
  else if(kos_v==128) volt_os=volt_os>>7;
  oshibka_v-=volt_os;
- if(kprop_v==1) Uv_p=oshibka_v;
+ if(kprop_v==1) Uv_p=oshibka_v;//proportional P-channel
  else if(kprop_v==2) Uv_p=oshibka_v<<1;
  else if(kprop_v==4) Uv_p=oshibka_v<<2;
  else if(kprop_v==8) Uv_p=oshibka_v<<3;
@@ -306,7 +311,7 @@ void timer0_comp_isr(void)
  else if(kprop_v==32) Uv_p=oshibka_v<<5;
  else if(kprop_v==64) Uv_p=oshibka_v<<6;
  else if(kprop_v==128) Uv_p=oshibka_v<<7;
- if((PIND&0x40)==0x00)Uv_i=0;
+ if((PIND&0x40)==0x00)Uv_i=0;//integral I-channel
  else if(tinteg_v==0) Uv_i=0;
  else if(tinteg_v==1) Uv_i=oshibka_v;
  else if(tinteg_v==2) Uv_i=oshibka_v>>1;
@@ -319,24 +324,24 @@ void timer0_comp_isr(void)
  Urn=Uv_p+Uv_i+oshibkaold_v;
  Uout_v=Urn;
  oshibkaold_v=Uout_v-Uv_p; 
- switch(iupor)
+ switch(iupor)//Restriction block
          {
          case 5: { if(Urn>=50) Urn=50;
-                   else if(Urn<-50) Urn=-50;}
+                   else if(Urn<-50) Urn=-50;}//0.5A
 				   break;
 		 case 10: { if(Urn>=100) Urn=100;
-                   else if(Urn<-100) Urn=-100;}
+                   else if(Urn<-100) Urn=-100;}//1A
 				   break;
 		 case 15: { if(Urn>=150) Urn=150;
-                   else if(Urn<-150) Urn=-150;}
+                   else if(Urn<-150) Urn=-150;}//1.5A
 				   break;
 		 case 20: { if(Urn>=200) Urn=200;
-                   else if(Urn<-200) Urn=-200;}
+                   else if(Urn<-200) Urn=-200;}//2A
 				   break;
 		 }         
  }}
  //-------------------Current regulator---------------
-  if(kos_i==1) tok_os=tok_os;
+  if(kos_i==1) tok_os=tok_os;//Feedback amplification
  else if(kos_i==2) tok_os=tok_os>>1;
  else if(kos_i==4) tok_os=tok_os>>2;
  else if(kos_i==8) tok_os=tok_os>>3;
@@ -345,7 +350,7 @@ void timer0_comp_isr(void)
  else if(kos_i==64) tok_os=tok_os>>6;
  else if(kos_i==128) tok_os=tok_os>>7;
  oshibka_i=Urn-tok_os;
- if(kprop_i==1) Ui_p=oshibka_i;
+ if(kprop_i==1) Ui_p=oshibka_i;//proportional P-channel
  else if(kprop_i==2) Ui_p=oshibka_i>>1;
  else if(kprop_i==4) Ui_p=oshibka_i>>2;
  else if(kprop_i==8) Ui_p=oshibka_i>>3;
@@ -353,7 +358,7 @@ void timer0_comp_isr(void)
  else if(kprop_i==32) Ui_p=oshibka_i>>5;
  if((PIND&0x40)==0x00)Ui_i=0;
  else if(tinteg_i==0) Ui_i=0;
- else if(tinteg_i==1) Ui_i=oshibka_i;
+ else if(tinteg_i==1) Ui_i=oshibka_i;//integral I-channel
  else if(tinteg_i==2) Ui_i=oshibka_i>>1;
  else if(tinteg_i==4) Ui_i=oshibka_i>>2;
  else if(tinteg_i==8) Ui_i=oshibka_i>>3;
@@ -442,7 +447,7 @@ CLI();
 TCCR2=0x00;//stop T2
 TCNT2=0x00;//reset T2
 PORTD&=0x7F;
-if((PIND&0x08)==0x08)
+if((PIND&0x08)==0x08)//if there is no current, then change direction
  {
  FWD=FWD_ref;
  REV=REV_ref;
@@ -457,7 +462,7 @@ void uart0_rx_isr(void)
  CLI();
  uart_data=UDR;
  global=uart_data;
- global=global>>7;
+ global=global>>7;//high bit selection
  global&=0x01;
  if(global==1)
    {
@@ -552,51 +557,51 @@ void uart0_rx_isr(void)
  }
  SEI();
 }
-void Progr(void)                                                                                                   
+void Progr(void)//Selecting the "Right" parameter                                                                                                   
 {
 if((PINB&0x01)==0x00) s=1;
 else { if(s==1)
      {
-	 flag_1=1;
+	 flag_1=1;//transmission permission
 	 flag1_1=0;
 	 post_1=4;
 	 if(t==7) {t=0; s=0;}
 	 else {t=t+1; s=0;}
 	 }}
 }
-void Esc(void)
+void Esc(void)//Selecting the "Left" parameter
 {
 if((PINB&0x02)==0x00) o=1;
 else { if(o==1)
      {
-	  flag_1=1;
+	  flag_1=1;//transmission permission
 	  flag1_1=0;
 	  post_1=4;
 	 if(t==0) {t=7; o=0;}
 	 else {t=t-1; o=0;}
 	 }}
 }
-void Vverh(void)
+void Vverh(void)//increase parameter value
 {
 if((PINB&0x04)==0x00) p=1;
 else { if(p==1)
      {
 	 k=1;
-	 obrabotka_t();
+	 obrabotka_t();//call the subroutine for processing button clicks
 	 }}
 }
-void Vniz(void)
+void Vniz(void)//decreasing the parameter value
 {
 if((PINB&0x08)==0x00) r=1;
 else { if(r==1)
      {
 	 k=2;
-	 obrabotka_t();
+	 obrabotka_t();//call the subroutine for processing button clicks
 	 }}
 }
-void obrabotka_t(void)
+void obrabotka_t(void)//call the subroutine for processing button clicks
 {
-     flag_1=1;
+     flag_1=1;// enable transmission
      flag1_1=0;
 	 post_1=4;
      switch(t)
@@ -717,7 +722,7 @@ void obrabotka_t(void)
 					  break;	
      }                     
 }
-void Vvod(void)
+void Vvod(void)// Subroutine for pressing the Enter button - saving data to EEPROM
 {
 if((PINB&0x20)==0x00) l=1;
 else { if(l==1)
@@ -770,12 +775,12 @@ void main(void)
 {
  init_devices();
  //-----------------------driver/load-----------------------
- if(((PINB&0x40)==0x00)&&((PINB&0x80)==0x80))
+ if(((PINB&0x40)==0x00)&&((PINB&0x80)==0x80))//read controller parameters from ROM
    {
    kprop_i=8; tinteg_i=1; fkvant=1; iupor=20;
    kprop_v=4; tinteg_v=32; kos_i=1; kos_v=1;
    }
- else { if(((PINB&0x40)==0x00)&&((PINB&0x80)==0x00))
+ else { if(((PINB&0x40)==0x00)&&((PINB&0x80)==0x00))// read controller parameters from EEPROM
    {
    while(EECR&0x01) {;}
    EEAR=0;
@@ -841,10 +846,10 @@ while(1)
 	}
 //--------------------------------------------------
  if(flag_1==1)
- {transmit_data_1();}
+ {transmit_data_1();}//call transfer routine 1
  if(flag_2==1)
  {
- transmit_data_2();
+ transmit_data_2();//call transfer routine 2
  }
 //--------------------------------------------------	
   }
@@ -860,7 +865,7 @@ void transmit_data_1(void)
        flag1_1=1;
 	   flag1_2=0;
        post_2=0;
-       post1();
+       post1();//call auxiliary data transfer routine 1
  }
  }
  }
